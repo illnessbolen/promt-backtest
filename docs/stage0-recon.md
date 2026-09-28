@@ -1,12 +1,32 @@
 # Этап 0: разведка источников данных (@bosona)
 
-Дата: 2026-09-28. Кошелёк: `0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed`.
+Дата: 2026-09-28. Кошелёк (proxy wallet): `0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed`.
 
 Как помечена надёжность утверждений:
 
 - **[live]**: проверено живым запросом из этого окружения; сырые ответы лежат в `docs/samples/stage0/`.
-- **[src]**: взято из официального кода Polymarket на GitHub: `Polymarket/rs-clob-client` @ `dc8f1e5` (2026-05-11) и `Polymarket/ctf-exchange-v2` @ HEAD. Первоисточник, но живым запросом не проверено.
-- **[web]**: взято из выдачи веб-поиска: сниппеты страниц docs.polymarket.com и сторонних статей. Сам docs.polymarket.com из окружения недоступен, поэтому эти утверждения нужно перепроверить.
+- **[docs]**: прочитано на docs.polymarket.com (страницы `*.md`, changelog, OpenAPI `data-api.polymarket.com/v2/openapi.json`).
+- **[src]**: официальный код Polymarket: `Polymarket/ctf-exchange-v2`, `Polymarket/rs-clob-client` @ `dc8f1e5`. Живым запросом не проверено.
+- **[web]**: сторонние статьи. Используется только там, где нет первоисточника.
+
+## Итог в пяти пунктах
+
+1. **Всю историю выкачать можно, и быстро, но только через Data API v2.**
+   - Курсорная пагинация, до 1000 строк на страницу, потолка глубины нет.
+   - Реальный объём ~545K сделок и ~700K строк активности, это ~700 страниц (~10 мин).
+   - Data API v1 упирается в offset 5000 и **выключается 24.10.2026**.
+2. **Роль maker/taker определяется без блокчейна.** `/v2/trades?taker_only=true` возвращает ровно его taker-fills, а разница с `taker_only=false` — это maker-fills.
+   Комиссия считается по формуле. Проверено до цента против `entry_fees_usdc` и `fees_paid`.
+3. **Данные противоречат CLAUDE.md в трёх местах** (§7):
+   - «89.6K сделок» — это 89 590 **рынков**, а сделок ~540K;
+   - «$20.6M» — это 20.6M **shares**, а в USDC ~$10.4M;
+   - первая сделка была 2 июня, а не в мае.
+   PnL ~+$347K подтверждается.
+4. **Он никогда не продаёт:** 0 SELL за всю историю. Выход идёт только через MERGE и REDEEM.
+   В выборке за 27.09 около **91% fills maker** и в 48% рынков он покупал обе стороны.
+   Это похоже на маркет-мейкинг, проверять будем на этапе 4.
+5. **Правила разрешения 5m/15m/4h сменились 07.08 и 14.08.2026** (спот Chainlink на TWAP Chainlink).
+   1h и daily резолвятся по свечам Binance. Историю нужно анализировать по режимам.
 
 ---
 
@@ -14,369 +34,381 @@
 
 | Хост | Статус | Нужен для |
 |---|---|---|
+| `data-api.polymarket.com` | ✅ 200 (открыт) | сделки, активность, позиции, PnL |
+| `docs.polymarket.com` | ✅ 200 (открыт) | документация |
 | `gamma-api.polymarket.com` | ✅ 200 | метаданные рынков, правила резолва, strike/final |
-| `clob.polymarket.com` (REST) | ✅ 200 | книга, цены, tick/fee, prices-history |
-| `data-api.binance.vision` | ✅ 200 | Binance spot klines 1s / aggTrades (зеркало только для рыночных данных) |
-| `api.exchange.coinbase.com` | ✅ 200 | Coinbase BTC-USD (лучший прокси Chainlink, см. §4.4) |
-| `data-api.polymarket.com` | ❌ **403 от прокси** | **/activity, /trades, /positions, /closed-positions: ключевой источник этапа 1** |
-| `docs.polymarket.com` | ❌ 403 (и через WebFetch тоже) | сверка с документацией |
-| Polygon RPC (`polygon-rpc.com`, publicnode, drpc, ankr, llamarpc), polygonscan | ❌ 403 | запасной on-chain источник |
-| `api.goldsky.com` (subgraph) | ❌ 403 | запасной источник |
-| `ws-live-data.polymarket.com`, `ws-subscriptions-clob.polymarket.com` | ❌ 403 | этап 3 (RTDS Chainlink, WS книги) |
+| `clob.polymarket.com` (REST) | ✅ 200 | книга, цены, tick/fee |
+| `data-api.binance.vision` | ✅ 200 | Binance spot klines 1s / aggTrades |
+| `api.exchange.coinbase.com` | ✅ 200 | Coinbase BTC-USD (лучший прокси Chainlink, §4.4) |
+| `polygon-rpc.com` | ⚠️ сеть открыта, но RPC отвечает `401 "API key disabled, reason: tenant disabled"` | анонимный доступ больше не работает |
+| прочие Polygon RPC (`polygon-bor-rpc.publicnode.com`, `polygon.drpc.org`, `1rpc.io`, ankr), polygonscan | ❌ 403 от прокси | on-chain сверка (опционально, §2.4) |
+| `ws-live-data.polymarket.com`, `ws-subscriptions-clob.polymarket.com`, `data-stream.binance.vision` | ❌ 403 | понадобятся на этапе 3 |
 | `api.binance.com` | ⚠️ 451 (гео-блок) | заменяется `data-api.binance.vision` |
 
-**Нужно от тебя:** добавить в allowlist окружения (Network access в настройках environment) как минимум
-`data-api.polymarket.com` и `docs.polymarket.com`, плюс один Polygon RPC (например `polygon-bor-rpc.publicnode.com`).
-Для этапа 3 понадобятся ещё `ws-live-data.polymarket.com`, `ws-subscriptions-clob.polymarket.com` и `data-stream.binance.vision`.
-После этого я прогоню проверки из §1.4 и закрою пробелы, помеченные [src] и [web].
+Для on-chain сверки (logIndex, мс-время ордеров) нужен рабочий RPC, например `polygon-bor-rpc.publicnode.com`. Для этапа 1 он **не обязателен**, см. §1.6.
 
 ---
 
-## 1. Data API: `/activity`, `/trades`, `/positions`, `/closed-positions`
+## 1. Data API ([live] + [docs])
 
-⚠️ Живых ответов нет: хост заблокирован. Ниже схема из официального Rust-клиента Polymarket ([src], файлы `src/data/types/{request,response}.rs`).
+### 1.1 v1 или v2
 
-### 1.1 Параметры и лимиты
+- v2 вышел 2026-09-04. **v1 выключается 2026-10-24** [docs `migrate/data-api-v1-to-v2`]. v1 заморожен, новые поля появляются только в v2.
+- Отличия v2:
+  - ответ в конверте `{data, pagination}`;
+  - поля в `snake_case`;
+  - курсор `pagination.next_cursor` вместо offset;
+  - `condition` принимает до 20 id;
+  - `/closed-positions` заменён на `/v2/positions?status=CLOSED`.
+- **Этап 1 строим на v2.** v1 проверен только для полноты картины.
 
-| Эндпоинт | Ключевые параметры | limit | offset |
-|---|---|---|---|
-| `GET /activity` | `user` (обяз.), `market` (CSV conditionId) \| `eventId`, `type` (CSV), `start`, `end` (unix-сек), `sortBy`=TIMESTAMP\|TOKENS\|CASH, `sortDirection`=ASC\|DESC, `side` | 0–**500** (по умолч. 100) | 0–**10000** |
-| `GET /trades` | `user`, `market` \| `eventId`, `side`, **`takerOnly` (по умолчанию `true`!)**, `filterType`+`filterAmount` | 0–**10000** | 0–**10000** |
-| `GET /positions` | `user`, `market` \| `eventId`, `sizeThreshold` (по умолч. 1), `redeemable`, `mergeable`, `sortBy`, `title` | 0–500 | 0–10000 |
-| `GET /closed-positions` | `user`, `market` \| `eventId`, `title`, `sortBy` (по умолч. REALIZEDPNL) | 0–**50** | 0–100000 |
+### 1.2 Реальные лимиты (проверено [live])
 
-Типы активности [src]: `TRADE, SPLIT, MERGE, REDEEM, REWARD, CONVERSION, YIELD, MAKER_REBATE`.
+| Эндпоинт | limit | Глубина | Время-окно | Примечание |
+|---|---|---|---|---|
+| v1 `GET /activity` | ≤500 (больше молча режется до 500) | **offset ≤ 5000**, иначе `400 "max historical activity offset of 5000 exceeded"` | `start`/`end` | до 5 500 строк на окно; за одни сутки у него 6 138 строк |
+| v1 `GET /trades` | ≤10 000 | offset ≤ 10 000, иначе `400 "max historical trades offset of 10000 exceeded"` | `start`/`end` работают | `takerOnly` по умолчанию `true` |
+| v1 `GET /closed-positions` | ≤50 | — | — | |
+| **v2 `GET /v2/activity`** | ≤1000 (1001 даёт `400`) | курсор; проверено 25 страниц / 25 000 строк без упора | `start`/`end` (сек, включительно; `start=1` = вся история) | 0.77 с на страницу |
+| **v2 `GET /v2/trades`** | ≤1000 | курсор | `start`/`end` (только для `user`) | **`taker_only` по умолчанию `true`** |
+| v2 `GET /v2/positions` | ≤1000 | курсор | `start`/`end` по `last_event_at` | `status=OPEN\|REDEEMABLE\|REDEEMABLE_LOST\|MERGEABLE\|CLOSED` |
 
-Ловушка: у `/trades` по умолчанию `takerOnly=true`, поэтому без `takerOnly=false` пропадут все его maker-исполнения.
+Rate limits [docs `api-reference/rate-limits`]:
 
-### 1.2 Поля ответов [src]
+- v2: общий 800/10 с; `/v2/trades` 300/10 с; `/v2/activity` и `/v2/positions` 200/10 с;
+- v1: общий 1000/10 с, `/trades` 200/10 с;
+- Gamma: 4000/10 с (`/events` 500, `/markets` 300);
+- CLOB: `/book` 1500/10 с;
+- при превышении v2 отвечает `429` + `Retry-After`.
 
-- **Activity**: `proxyWallet, timestamp (i64, сек), conditionId, type, size, usdcSize, transactionHash, price, asset (token id), side, outcomeIndex, outcome, title, slug, eventSlug, icon, name, pseudonym, bio, profileImage…`
-- **Trade**: `proxyWallet, side, asset, conditionId, size, price, timestamp (сек), title, slug, eventSlug, outcome, outcomeIndex, name, pseudonym, …, transactionHash`
-- **Position**: `asset, conditionId, size, avgPrice, initialValue, currentValue, cashPnl, percentPnl, totalBought, realizedPnl, percentRealizedPnl, curPrice, redeemable, mergeable, outcome, outcomeIndex, oppositeOutcome, oppositeAsset, endDate, negativeRisk, …`
-- **ClosedPosition**: `asset, conditionId, avgPrice, totalBought, realizedPnl, curPrice, timestamp, outcome, outcomeIndex, oppositeOutcome, oppositeAsset, endDate, …`
+### 1.3 Типы активности и особенности ([live])
 
-**Чего в Data API нет:** `logIndex`, роли maker/taker, комиссии и времени точнее секунды.
-Поэтому для надёжной дедупликации и роли нужен on-chain источник (§2.3).
+За всю историю встретились: `TRADE`, `MERGE`, `REDEEM`, `REWARD`, `MAKER_REBATE`, **`TAKER_REBATE`**.
+Последнего типа нет в enum официального Rust-клиента, так что парсер должен принимать неизвестные типы.
+`SPLIT`, `CONVERSION` и `YIELD` у него не встречались.
 
-### 1.3 Data API v2 [web]
+- **REDEEM** с 2026-08-10 пишется по строке на исход [docs changelog].
+  Пример: одна tx дала `Up size 150 → usdcSize 150` и `Down size 50 → usdcSize 0`. Выплата равна сумме `usdcSize` по tx.
+- v1 дополнительно отдаёт «пустые» REDEEM (`size 0`, `asset ""`, `outcomeIndex 999`), за сутки таких 349. **v2 их не отдаёт.** В остальном v1 и v2 совпали строка в строку (за 27.09).
+- `MAKER_REBATE`, `TAKER_REBATE` и `REWARD` идут раз в день, без `conditionId`.
+- `price` в TRADE может быть нецелым тиком (`0.0800000037`): это отношение сумм. `size` дробный, 6 знаков.
 
-Существует `data-api.polymarket.com/v2/...` (`/v2/trades`, `/v2/activity`) с cursor-пагинацией (`pagination.next_cursor`, без offset).
-Лента устроена как keyset-проход и стабильна при одновременной записи. Без `start` окно ограничено тремя годами назад, `start=1` даёт полную историю.
-Есть упоминания полей role и fee, но не подтверждены. **Если v2 отдаёт роль и комиссию, этап 1 сильно упрощается. Проверить первым делом.**
+### 1.4 Строка сделки v2 (реальный пример, `data_v2_activity.json`)
 
-### 1.4 Что прогнать сразу после открытия хоста
-
-```bash
-U=0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed; D=https://data-api.polymarket.com
-curl "$D/activity?user=$U&limit=5"                                  # структура, типы
-curl "$D/activity?user=$U&type=MERGE,REDEEM,SPLIT&limit=5"
-curl "$D/activity?user=$U&limit=500&offset=10000"                   # потолок offset
-curl "$D/activity?user=$U&limit=500&offset=10500"                   # ожидаем 400
-curl "$D/activity?user=$U&start=1790000000&end=1790086400&limit=500" # оконная выборка
-curl "$D/activity?user=$U&sortDirection=ASC&limit=5"                 # самая ранняя активность
-curl "$D/trades?user=$U&takerOnly=false&limit=5"                     # maker+taker
-curl "$D/trades?user=$U&limit=5"                                     # сравнить: только taker
-curl "$D/positions?user=$U&limit=5"; curl "$D/closed-positions?user=$U&limit=5"
-curl "$D/v2/trades?user=$U&limit=5"; curl "$D/v2/activity?user=$U&limit=5"
+```json
+{"proxy_wallet": "0xc2ad…40ed", "timestamp": 1790619864, "condition_id": "0x4e0ba471…86f7",
+ "type": "TRADE", "size": 84.115385, "usdc_size": 62.245385, "price": 0.7400000012,
+ "transaction_hash": "0x0780d41f…4298", "token_id": "101717…68447", "side": "BUY",
+ "outcome_index": 0, "outcome": "Up", "slug": "eth-updown-5m-1790619600", "event_slug": "eth-updown-5m-1790619600",
+ "title": "Ethereum Up or Down - September 28, 2:20PM-2:25PM ET", "name": "bosona", "pseudonym": "Impolite-Sister"}
 ```
 
-Отдельно проверить: одна строка TRADE соответствует одному fill или агрегату по tx.
-Сверка: число строк за день в Data API против числа `OrderFilled` с его адресом.
+**Чего нет ни в v1, ни в v2:** `log_index`, явной роли, комиссии fill'а, времени точнее секунды.
+
+### 1.5 Точность времени
+
+- `timestamp` — это **время блока в секундах** [docs OpenAPI].
+- Блок Polygon ≈ **1.5 с**: оценка по `source_block` в `/v2/user-pnl`, 6.73M блоков за 10.1M с.
+- Порядок внутри блока в API не восстановить: нужен on-chain `logIndex`.
+- Реальное время решения бота (мс) есть только в подписанном ордере V2 (`Order.timestamp`, calldata) [src].
+
+### 1.6 Роль maker/taker без блокчейна ([live])
+
+`/v2/trades?user=…&taker_only=true` по документации отдаёт «each fill once, on its taker side».
+Проверка на окне 27.09 16:00–17:00 UTC:
+
+- `taker_only=false` дал 129 строк, это **то же мультимножество**, что `/v2/activity?type=TRADE` и v1 `/activity`;
+- `taker_only=true` дал 16 строк, все входят в 129;
+- значит, 113 строк — maker-fills.
+
+За все сутки 27.09: 4 750 fills, из них **taker 444 (9.3%)** и **maker 4 306 (90.7%)**. По USDC доля taker 19.7%.
+
+Роль = разность мультимножеств по ключу `(tx, token, side, size, price)`.
+
+### 1.7 Дубликаты ([live])
+
+За сутки нашлось 3 пары **полностью одинаковых строк** в одной tx, например `0xc12bff…: BUY 249 @ 0.97 Down` ×2.
+Обе строки — maker-fills (в `taker_only=true` их 0), то есть это два реальных fill'а, а не повтор API.
+
+Поэтому ключ дедупликации без `log_index` обязан включать порядковый номер `seq` среди одинаковых строк tx.
+Все строки tx имеют одинаковый `timestamp`, так что при окнах, целиком покрывающих секунду tx, `seq` стабилен.
+
+### 1.8 Полезные агрегаты v2 ([live])
+
+- `/v2/user-stats`:
+  - `trades: 89590` — это **число различных рынков** (так в доке миграции);
+  - `trade_count: 540004`;
+  - `volume` 20.69M (shares), `volume_usdc` 10.40M;
+  - разложение PnL: `trade_pnl`, `fees_paid`, `maker_rebate`, `taker_rebate`, `reward_income`…
+- `/v2/user-volume?start&end` — объём и число сделок за UTC-дни. Так получена дневная статистика с 02.06: 544 939 сделок.
+- `/v2/user-pnl?interval=all&fidelity=1d` — дневной ряд PnL со всеми компонентами. Нужен для сверки этапа 1.
+- `/v2/positions` содержит `entry_fees_usdc`, `realized_pnl`, `status`.
+- Также есть `/v2/resolutions` (состояние резолва) и `/v2/status` (свежесть данных; lag ~4 с).
 
 ---
 
-## 2. Пагинация: можно ли выкачать ~90K сделок
+## 2. Можно ли выкачать всю историю
 
-### 2.1 Data API
+### 2.1 Объём
 
-- Потолок offset равен 10 000 [src], [web]: запросы дальше потолка получают 400, «тихого» обрезания нет.
-  Один запрос покрывает не больше ~10 500 строк.
-- Обход: **резать по времени** (`start`/`end` в `/activity`), у каждого окна свой бюджет offset.
-  ~89.6K сделок за ~130 дней дают в среднем ~700 в день. Окно в 1 сутки с адаптивным делением пополам, если окно упирается в 10K.
-  Выходит ~200–400 запросов по 500 строк, это минуты работы.
-- Альтернатива: v2 cursor (§1.3), без потолка offset.
-- Rate limits [web]: Data API ~1000 запросов / 10 с общий, `/trades` 200/10 с, `/positions` 150/10 с.
-  Троттлинг Cloudflare (задержка, а не 429). Gamma 4000/10 с (`/events` 500/10 с, `/markets` 300/10 с).
+- Первая сделка: **2026-06-02 21:34:39 UTC**. Профиль создан 2026-05-21.
+- За 119 дней **544 939 fills** (~4 600 в день, стабильно с первой недели).
+- Добавим ~120K строк REDEEM/MERGE (~1 000 в сутки по срезу 27.09): всего **~0.65–0.7M строк активности**.
 
-### 2.2 Gamma (проверено [live])
+### 2.2 Стратегия выгрузки
 
-- `/events` и `/markets`: максимум **100 на страницу**, `offset` больше ~2000 даёт `422 "offset too large, use /events/keyset"`.
-- `/events/keyset?...&limit=100&after_cursor=<next_cursor>` работает [live]: 3658 открытых up-or-down событий за 37 страниц.
+- **v2 `/v2/activity?user=…&start=1&limit=1000`**, проход по курсору: ~700 страниц × 0.77 с ≈ **10 мин**.
+  Курсор привязан к фильтрам, поэтому фильтры нужно пересылать на каждой странице.
+- Отдельно `/v2/trades?taker_only=true` за тот же период (~50K строк) даёт роль.
+- **Идемпотентная докачка:** `start = max(ts) − 1 ч` (перекрытие), `INSERT OR IGNORE` по ключу. Курсор между запусками не храним.
+- v1 не годится. При потолке offset 5000 сутки не помещаются в одно окно, понадобились бы часовые окна: ~3 000 окон и более 5 000 запросов. К тому же v1 скоро выключат.
+
+### 2.3 Gamma ([live])
+
+- `/events` и `/markets`: максимум 100 на страницу, offset больше ~2000 даёт `422`.
+- Для глубоких выборок есть `/events/keyset` и `/markets/keyset` (`after_cursor`/`next_cursor`).
 - `/series`: максимум 50 на страницу.
+- **`/markets` по умолчанию `closed=false`** [docs changelog 2026-04-09]: без `closed=true` закрытые рынки молча не возвращаются.
+- Пачка из 50 `condition_ids` за запрос работает.
 
-### 2.3 Запасной источник: on-chain `OrderFilled` (CLOB V2)
+### 2.4 Запасной и проверочный источник: on-chain `OrderFilled` (CLOB V2)
 
-**Важно:** 2026-04-28 ~11:00 UTC Polymarket перешёл на **CLOB V2**: новые контракты биржи, новый коллатерал pUSD, новый формат события [web].
-Профиль @bosona создан 2026-05-21 [live], значит вся его история на V2.
+Статус: не проверено живьём, потому что нет рабочего RPC (§0). Для этапа 1 не обязателен: роль и комиссия уже есть из API.
+Нужен для трёх вещей: `log_index`, мс-времени ордеров и независимой сверки.
 
-Адреса (Polygon, [src] README ctf-exchange-v2):
-
-| Контракт | Адрес |
-|---|---|
-| CTFExchangeV2 (Up/Down рынки, `negRisk=false`) | `0xE111180000d2663C0091e4f400237545B87B996B` |
-| NegRiskCtfExchangeV2 | `0xe2222d279d744050d28e00520010520000310F59` |
-| pUSD (CollateralToken proxy) | `0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB` |
-| CtfCollateralAdapter (split/merge/redeem за pUSD) | `0xADa100874d00e3331D00F2007a9c336a65009718` |
-| ConditionalTokens (ERC-1155) | `0x4D97DCd97eC945f40cF65F87097ACe5EA0476045` |
-
-Событие V2 [src] `src/exchange/interfaces/ITrading.sol`:
-
-```
-OrderFilled(bytes32 indexed orderHash, address indexed maker, address indexed taker,
-            uint8 side, uint256 tokenId, uint256 makerAmountFilled, uint256 takerAmountFilled,
-            uint256 fee, bytes32 builder, bytes32 metadata)
-topic0 = 0xd543adfd945773f1a62f74f0ee55a5e3b9b1a28262980ba90b1a89f2ea84d8ee
-OrdersMatched(bytes32 indexed takerOrderHash, address indexed takerOrderMaker, uint8 side, uint256 tokenId, uint256 makerAmountFilled, uint256 takerAmountFilled)
-topic0 = 0x174b3811690657c217184f89418266767c87e4805d09680c39fc9c031c0cab7c
-```
-
-(V1-событие, для справки: `0xd0a08e8c…f6`, у него другая сигнатура.)
-
-**Роль maker/taker определяется однозначно** (по `Trading.sol`):
-
-- для каждого maker-ордера эмитится `OrderFilled(maker = владелец maker-ордера, taker = владелец taker-ордера)`;
-- для taker-ордера эмитится `OrderFilled(maker = владелец taker-ордера, taker = адрес биржи)` и `OrdersMatched`.
-
-Отсюда фильтры логов:
-
-- `topic2 == bosona`: все его исполнения. Если `topic3 == 0xE1111800…`, он **taker**, иначе **maker**;
-- `topic3 == bosona`: контрагенты-мейкеры его taker-ордеров, то есть по каким уровням книги он прошёл.
-
-Там же есть `fee` (фактическая комиссия fill'а) и точный порядок (`blockNumber`, `logIndex`).
-
-Суммы в 6 знаках. BUY: `makerAmountFilled` = pUSD, `takerAmountFilled` = токены. SELL наоборот.
-
-Бонус: в V2 подписанный `Order` содержит **`timestamp` в миллисекундах** (время создания ордера).
-Он лежит в calldata `matchOrders`, и через `eth_getTransactionByHash` можно получить момент решения бота с точностью до мс. Это ценно для анализа реакции на спот (гипотеза 3).
-
-Split/merge/redeem через адаптер своих событий не эмитят [src]. У пользователя они видны как ERC-1155 `TransferBatch` на ConditionalTokens (`0x4a39dc06…f7fb`):
-
-- merge/redeem: пользователь → адаптер;
-- split: адаптер → пользователь;
-
-плюс Transfer pUSD. Проще брать их из `/activity`.
-
-Subgraph [web]: старый Goldsky `orderbook-subgraph` после миграции на V2 неполный. Не полагаться на него без проверки.
+- CLOB V2 работает с **2026-04-28 ~11:00 UTC** [docs changelog], так что вся история @bosona на V2.
+- Адреса [docs `resources/contracts`, «single source of truth»]:
+  - CTF Exchange `0xE111180000d2663C0091e4f400237545B87B996B` (Up/Down, `negRisk=false`);
+  - Neg Risk CTF Exchange `0xe2222d279d744050d28e00520010520000310F59`;
+  - Conditional Tokens `0x4D97DCd97eC945f40cF65F87097ACe5EA0476045`;
+  - pUSD `0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB`;
+  - CtfCollateralAdapter `0xAdA100Db00Ca00073811820692005400218FcE1f`. В README ctf-exchange-v2 указан другой адрес, `0xADa100874d00e3331D00F2007a9c336a65009718`: адаптер передеплоили, учитывать оба.
+- Событие [src `ITrading.sol`]: `OrderFilled(bytes32 indexed orderHash, address indexed maker, address indexed taker, uint8 side, uint256 tokenId, uint256 makerAmountFilled, uint256 takerAmountFilled, uint256 fee, bytes32 builder, bytes32 metadata)`, topic0 `0xd543adfd945773f1a62f74f0ee55a5e3b9b1a28262980ba90b1a89f2ea84d8ee`.
+- Роль [src `Trading.sol`]:
+  - maker-ордер эмитит `OrderFilled(maker = его владелец, taker = владелец taker-ордера)`;
+  - taker-ордер эмитит `OrderFilled(maker = владелец taker-ордера, taker = адрес биржи)` + `OrdersMatched`.
+  - Значит, фильтр `topic2 == bosona`: при `topic3 == биржа` он taker, иначе maker.
+- Split/merge/redeem идут через адаптер. Своих событий нет, видны как ERC-1155 `TransferBatch` на CTF.
+- В 2026 есть и альтернативы: Goldsky pipelines, Dune, Allium [docs `resources/blockchain-data`]. Старый subgraph после V2 неполный [web].
 
 ---
 
 ## 3. Метаданные рынков через Gamma ([live])
 
-### 3.1 Вселенная Up/Down (открытые серии на сегодня)
+### 3.1 Вселенная Up/Down
 
-Активы: **BTC, ETH, SOL, XRP, DOGE, BNB, HYPE, ZEC**.
-Таймфреймы: **5m, 15m, 4h, 1h, daily**. По открытым сериям на 28.09 у BTC/ETH/SOL/XRP/DOGE/BNB/HYPE есть все пять таймфреймов, у ZEC только 5m/15m/4h.
+Активы: BTC, ETH, SOL, XRP, DOGE, BNB, HYPE, ZEC. Таймфреймы: 5m, 15m, 4h, 1h, daily.
+По открытым сериям на 28.09 у BTC/ETH/SOL/XRP/DOGE/BNB/HYPE есть все пять таймфреймов, у ZEC только 5m/15m/4h.
 
-| Таймфрейм | slug события/рынка | seriesSlug |
+| Таймфрейм | slug | seriesSlug |
 |---|---|---|
 | 5m / 15m / 4h | `{btc,eth,sol,xrp,doge,bnb,hype,zec}-updown-{5m,15m,4h}-{unix_ts начала окна}` | `btc-up-or-down-15m` … |
 | 1h | `{bitcoin,ethereum,solana,xrp,dogecoin,bnb,hype}-up-or-down-{month}-{day}-{year}-{h}{am,pm}-et` | `btc-up-or-down-hourly` … |
 | daily | `{…}-up-or-down-on-{month}-{day}-{year}` (в 2025 без года) | `btc-up-or-down-daily` … |
 
-Кроме крипты, в том же теге `up-or-down` есть ежедневные рынки на акции, индексы и FX (`feeType=finance_prices_fees`). Их отфильтровываем.
+Тег `up-or-down` включает и акции, индексы, FX (`feeType=finance_prices_fees`). Их отфильтровываем.
 
 ### 3.2 Как получить рынок
 
-- по slug: `GET /events/slug/{slug}` или `GET /markets/slug/{slug}`. Работает и для закрытых рынков;
-- по conditionId пачкой: `GET /markets?closed=true&condition_ids=…&condition_ids=…` (проверено 50 штук за запрос).
-  **Ловушка:** без `closed=true` закрытые рынки молча не возвращаются (`[]`);
-- по token id: `GET /markets?closed=true&clob_token_ids=…`;
-- CLOB: `GET /markets/{conditionId}` возвращает `tokens[{token_id, outcome, price, winner}]`, так что победитель есть и там.
+- По slug: `GET /events/slug/{slug}` или `/markets/slug/{slug}`.
+- Пачкой по conditionId: `GET /markets?closed=true&condition_ids=…&condition_ids=…` (до 50).
+- По token id: `GET /markets?closed=true&clob_token_ids=…`.
+- CLOB `GET /markets/{conditionId}` возвращает `tokens[{token_id, outcome, price, winner}]`.
 
-### 3.3 Ключевые поля (пример `btc-updown-15m-1790616600`, файл `gamma_event_btc_15m_resolved.json`)
+### 3.3 Ключевые поля (`gamma_event_btc_15m_resolved.json`)
 
 ```jsonc
 "conditionId": "0xf6a64d2d…db41e",
-"outcomes": "[\"Up\", \"Down\"]",                 // JSON в строке
-"clobTokenIds": "[\"72701660…15502\", \"72842718…78432\"]",  // тот же порядок: [Up, Down]
-"eventStartTime": "2026-09-28T17:30:00Z",         // начало окна
-"endDate": "2026-09-28T17:45:00Z",                // конец окна
-"acceptingOrdersTimestamp": "2026-09-27T17:37:50Z", // торги открыты за ~24 ч ДО окна!
-"closedTime": "2026-09-28 17:46:27+00", "umaResolutionStatus": "resolved", "automaticallyResolved": true,
-"outcomePrices": "[\"1\", \"0\"]",                 // итог: Up
-"orderMinSize": 5, "orderPriceMinTickSize": 0.001, // tick динамический: 0.01 ↔ 0.001 у краёв
-"feesEnabled": true, "feeType": "crypto_fees_v2",
-"feeSchedule": {"exponent": 1, "rate": 0.07, "takerOnly": true, "rebateRate": 0.2},
-"makerBaseFee": 1000, "takerBaseFee": 1000, "makerRebatesFeeShareBps": 10000,
+"outcomes": "[\"Up\", \"Down\"]", "clobTokenIds": "[\"72701660…\", \"72842718…\"]",  // порядок совпадает
+"eventStartTime": "2026-09-28T17:30:00Z", "endDate": "2026-09-28T17:45:00Z",        // окно
+"acceptingOrdersTimestamp": "2026-09-27T17:37:50Z",   // торги открыты за ~24 ч ДО окна
+"closedTime": "2026-09-28 17:46:27+00", "outcomePrices": "[\"1\", \"0\"]",            // итог
+"orderMinSize": 5, "orderPriceMinTickSize": 0.001,     // tick динамический 0.01 ↔ 0.001
+"feeType": "crypto_fees_v2", "feeSchedule": {"exponent": 1, "rate": 0.07, "takerOnly": true, "rebateRate": 0.2},
 "cryptoMarketConfig": {"id": "btc-15m-twap-60", "asset": "btc", "duration": "15m", "twapEnabled": true, "twapLookbackSeconds": 60},
-// на уровне event:
-"eventMetadata": {"priceToBeat": 83884.316…, "finalPrice": …}   // strike и итоговая цена
+"eventMetadata": {"priceToBeat": 83884.316…, "finalPrice": …}   // на уровне event
 ```
 
 ---
 
-## 4. Правила разрешения ([live]: описания рынков + сверка чисел)
+## 4. Правила разрешения ([live] описания + сверка чисел; даты подтверждены [docs changelog])
 
 ### 4.1 Сводка
 
 | Рынки | Период | Источник | Правило | Ничья |
 |---|---|---|---|---|
-| 5m, 15m, 4h | до **2026-08-07 00:00 UTC** | Chainlink Data Stream `{asset}-usd` (спот) | цена в конце окна ≥ цены в начале, тогда Up | Up |
-| 15m, 4h | с 2026-08-07 00:00 UTC | Chainlink `{asset}-usd-twap-60s-streams` | TWAP (lookback 60 с) ≥ цены начала, тогда Up | Up |
-| 5m | 2026-08-07 → 2026-08-14 00:00 UTC | Chainlink `…-twap-30s-streams` | то же, TWAP 30 с | Up |
-| 5m | с 2026-08-14 00:00 UTC | Chainlink `…-twap-60s-streams` | TWAP 60 с | Up |
-| 1h | весь период | **Binance `{ASSET}USDT` свеча 1h** | close ≥ open, тогда Up | Up |
-| daily | весь период | **Binance `{ASSET}USDT` 1m свеча 12:00 ET** | close(12:00 ET сегодня) > close(12:00 ET вчера), тогда Up | **50/50** |
+| 5m, 15m, 4h | до **2026-08-07 00:00 UTC** | Chainlink `{asset}-usd` (спот) | цена в конце ≥ цены в начале, тогда Up | Up |
+| 15m, 4h | с 2026-08-07 00:00 UTC | Chainlink `{asset}-usd-twap-60s-streams` | TWAP 60 с ≥ strike, тогда Up | Up |
+| 5m | 2026-08-07 → 2026-08-14 00:00 UTC | Chainlink TWAP 30 с | то же | Up |
+| 5m | с 2026-08-14 00:00 UTC | Chainlink TWAP 60 с | то же | Up |
+| 1h | весь период | Binance `{ASSET}USDT` свеча 1h | close ≥ open, тогда Up | Up |
+| daily | весь период | Binance 1m свеча 12:00 ET | close(сегодня) > close(вчера), тогда Up | **50/50** |
 
-Дату перехода нашёл бинарным поиском по `cryptoMarketConfigId`/`resolutionSource` для BTC/ETH/SOL/XRP/DOGE/BNB. Даты у всех активов одинаковые.
-Это совпадает с анонсом @PolymarketDevs [web].
-`cryptoMarketConfigId`: до перехода `btc-15m` (или `null` у рынков до ~августа), после `btc-15m-twap-60`, `btc-5m-twap-30`, `btc-5m-twap-60`.
+В TWAP-эпоху и strike, и итог берутся из TWAP-фида [docs changelog 2026-08-07].
+`cryptoMarketConfigId`: `null` (до ~августа), затем `btc-15m`, `btc-15m-twap-60`, `btc-5m-twap-30`, `btc-5m-twap-60`.
 
-→ **История @bosona делится на два режима резолва.** Бэктест и анализ обязаны учитывать режим. Особенно это касается поздних входов у самой границы окна: на TWAP-рынке «последний тик» уже не решает.
+### 4.2 Strike и итог
 
-### 4.2 «Цена открытия» (strike) и итог
+- `eventMetadata.priceToBeat` и `finalPrice`:
+  - 1h: совпали с open и close 1h-свечи Binance до цента;
+  - daily: совпали с close 1m-свечей 12:00 ET;
+  - 5m/15m/4h: цепочка `priceToBeat(N) == finalPrice(N−1)` точная.
+- Покрытие 96–100% окон. Пропуски восстанавливаются цепочкой и `outcomePrices`.
+- `priceToBeat` появляется в Gamma только после резолва предыдущего окна (~1 мин после старта). Live-трекеру strike считать самим.
+- Задержка резолва: 5m/15m ~20–90 с, 1h и daily ~12–13 мин.
 
-- `eventMetadata.priceToBeat` и `eventMetadata.finalPrice` у события Gamma. Проверено:
-  - **1h:** `priceToBeat` = open 1h-свечи Binance, `finalPrice` = close. Для рынка 12PM ET 28.09: 83370 / 83723.1, совпадает с `klines 1h` до цента;
-  - **daily:** `priceToBeat` = close 1m-свечи 12:00 ET вчера (84487.11), `finalPrice` = close 12:00 ET сегодня (83375.57), совпадает;
-  - **5m/15m/4h:** `priceToBeat(N) == finalPrice(N−1)` ровно (цепочка). Strike окна равен итоговой цене (TWAP) предыдущего окна.
-- Покрытие метаданных: 96–100% окон в день (замерено по трём дням).
-  Пропуски восстанавливаются цепочкой и через `outcomePrices`.
-- **`priceToBeat` появляется в Gamma только после резолва предыдущего окна**, то есть на ~1 мин позже старта окна.
-  Для live-трекера strike придётся считать самим (RTDS `crypto_prices_chainlink`, [src]: `wss://ws-live-data.polymarket.com`, символы `btc/usd`, ts в мс).
-- Задержка резолва (closedTime − конец окна): 5m и 15m ~20–90 с, 1h и daily ~12–13 мин (выборка из ~10 рынков).
+### 4.3 Chainlink в реальном времени
 
-### 4.3 Доступность Chainlink
-
-Chainlink Data Streams публично не отдаются: нужны ключи [web]. Исторический тиковый Chainlink недоступен.
-Остаются Gamma `priceToBeat`/`finalPrice` (точки на границах окон) и прокси для цены внутри окна.
+- Legacy RTDS (`wss://ws-live-data.polymarket.com`, без авторизации): топики `crypto_prices_chainlink`, `crypto_prices_twap_sixty`, `crypto_prices_twap_thirty`.
+  Помечены legacy, **удаление запланировано** [docs `migrate/rtds-to-polybolt`].
+- Замена — PolyBolt `wss://ws-live-v2.polymarket.com/ws` (`price.crypto.twap`).
+  Он **требует CLOB API credentials**, а их получают подписью ключом кошелька. Это конфликтует с ограничением «никаких ключей», **решение нужно на этапе 3**.
+  Кроме того, `price.crypto` в PolyBolt идёт от Pyth, а не от Chainlink.
+- Исторического тикового Chainlink публично нет.
 
 ### 4.4 Качество прокси (замер [live], BTC 15m, 12 окон)
 
 | Прокси | Смещение от Chainlink strike | σ |
 |---|---|---|
-| Coinbase `BTC-USD`, close 1m-свечи перед границей (до TWAP) | **−0.07 bps** | 0.63 bps |
-| Binance `BTCUSDT` 1s close перед границей (до TWAP, 05.08) | −8.54 bps | 0.50 bps |
-| Binance 1s, среднее за 60 с (TWAP-режим, 28.09): BTC / ETH / SOL | −3.26 / −3.37 / −3.51 bps | ~0.6 bps |
+| Coinbase `BTC-USD` close 1m перед границей (до TWAP) | **−0.07 bps** | 0.63 bps |
+| Binance `BTCUSDT` 1s перед границей (до TWAP, 05.08) | −8.54 bps | 0.50 bps |
+| Binance 1s, среднее 60 с (TWAP, 28.09): BTC / ETH / SOL | −3.26 / −3.37 / −3.51 bps | ~0.6 bps |
 
-Вывод: Binance 1s подходит с **скользящей поправкой на базис USDT/USD**, а базис дрейфует (−8.5 bps в августе, −3.3 bps в сентябре).
-Калибруем её по `priceToBeat`. Coinbase USD почти без смещения, но только 1m-свечи (тики через `/trades`).
+Binance 1s можно использовать с **поправкой на базис USDT/USD**, но базис дрейфует, поэтому калибруем его по `priceToBeat`.
 
 ---
 
-## 5. Комиссии
+## 5. Комиссии ([docs] + сверка [live])
 
-Текущее состояние, [live] с Gamma/CLOB для всех крипто Up/Down (5m…daily):
+- **Формула** [docs `trading/fees`]: `fee = C × feeRate × p × (1 − p)` в USDC, округление до 5 знаков.
+  Crypto: `feeRate 0.07`, **maker платит 0**, maker rebate 20% собранных taker-комиссий.
+  Комиссия ставится при матчинге (в V2 ордер не содержит `feeRateBps`).
 
-- `feeType: crypto_fees_v2`, `feeSchedule {rate: 0.07, exponent: 1, takerOnly: true, rebateRate: 0.2}`;
-- CLOB `/fee-rate` возвращает `{"base_fee": 1000}`, `maker_base_fee = taker_base_fee = 1000`. Это потолок для подписи ордера, а не фактическая ставка.
+  | p | taker fee на 100 shares | % номинала |
+  |---|---|---|
+  | 0.50 | $1.75 | 3.5% |
+  | 0.70 | $1.47 | 2.1% |
+  | 0.90 | $0.63 | 0.7% |
+  | 0.95 | $0.33 | 0.35% |
+  | 0.99 | $0.07 | 0.07% |
 
-Формула [web] (docs «Fees», сниппеты): **`fee = C · rate · p · (1 − p)`** в USDC, C — число shares. Платит только taker, maker платит 0.
+- **Сверка с его данными** [live]:
+  - `entry_fees_usdc` 40 последних закрытых позиций: 37/40 совпали с формулой по его taker-fills до 5-го знака, у позиций только с maker-fills ровно 0;
+  - 3 расхождения — позиции, у которых часть базиса списана при MERGE;
+  - дневные `fees_paid` за 27.09: $393.18 по `/v2/user-pnl` против $393.55 по формуле.
+- **Историческая ставка:** верхняя огибающая implied rate по позициям 04.06, 25.06, 13.07, 27.07 и 21.08 равна **ровно 0.0700**.
+  Сторонняя статья про «0.072 → 0.07 в июле» [web] ни changelog'ом, ни данными не подтверждается.
+- **Taker delay** (задержка матчинга marketable-ордеров на крипто-рынках) [docs changelog]:
+  - 250 мс;
+  - **50 мс** с 2026-08-17 11:00 UTC;
+  - **150 мс** с 2026-09-04 14:00 UTC.
 
-| Цена входа p | Комиссия taker, ¢ за share | % от номинала (= rate·(1−p)) |
-|---|---|---|
-| 0.50 | 1.75 | 3.50% |
-| 0.70 | 1.47 | 2.10% |
-| 0.90 | 0.63 | 0.70% |
-| 0.95 | 0.33 | 0.35% |
-| 0.99 | 0.07 | 0.07% |
+  Это «speed bump» в пользу мейкеров. Важно и для гипотезы 3 (опережение спота), и для копирования.
+- **Ребейты:** Taker Rebate Program по тирам; у него сейчас Gold [live public-profile].
+  Итоги из `/v2/user-stats`: `maker_rebate` $34 239, `taker_rebate` $4 522, `reward_income` $4 541, `fees_paid` −$36 282.
+- **Следствие для пар:** taker-покупка пары 0.49 + 0.49 обходится ≈ $1.015, «пара < $1» выгодна только как maker.
+- **История режимов:**
+  - 2026-01-05 — taker fees на 15m;
+  - 2026-02-12 — 5m;
+  - 2026-03-06 — вся крипта;
+  - 2026-03-30 — Fee Structure V2.
 
-- **Maker rebates:** 20% собранных taker-комиссий раздаётся мейкерам ежедневно [web].
-- **Taker Rebate Program** [web]: тиры по 30-дневному weighted volume. Профиль @bosona сейчас: `takerTier: 3 "Gold"`, `weightedVolume: 493229` [live]. Gold соответствует ~18% возврата taker-комиссий [web].
-- **История** [web]: taker fees на 15m-крипте с января 2026, на всей крипте (1h/4h/daily) с 2026-03-06, смена формулы около 2026-03-30.
-  Crypto rate снижен **0.072 → 0.07 в июле 2026**.
-  Gamma показывает *текущий* `feeSchedule` даже у апрельских рынков, так что историю ставок по Gamma не восстановить.
-  **Фактическую комиссию каждого fill'а надо брать из `OrderFilled.fee` on-chain.**
-  Контракт лишь проверяет, что `fee ≤ maxFeeRateBps` (по умолчанию 5%) от cash-объёма [src].
-- Следствие для гипотезы 1 (пара < $1): taker-покупка пары по 0.49+0.49 даёт комиссию ≈ 3.5¢, итого пара ≈ $1.015.
-  **Парная «арбитражка» в роли taker невыгодна**, пока сумма пары не ниже ~0.965. Поэтому роль maker или taker для него ключевая.
+  Вся история @bosona (с 02.06) идёт при текущей формуле.
 
 ---
 
 ## 6. Контекст для этапа 2 ([live])
 
-- CLOB `prices-history`: даже с `fidelity=1` шаг **~60 с** (≈5 точек на 5m-окно).
-  После резолва `/book` возвращает 404, **исторического стакана нет**. Стакан на момент сделки получим только live-снимками (этап 3).
-- CLOB `/price?side=BUY` возвращает **лучший bid**, `side=SELL` возвращает **лучший ask** (проверено против `/book`, 3 раза).
-  Это противоречит комментарию в `Polymarket/agent-skills`, поэтому лучше опираться на `/book`.
-- Книга: `bids` по возрастанию, `asks` по убыванию (лучшие цены в конце), `timestamp` в мс, `hash`.
-- Binance `data-api.binance.vision`: `klines interval=1s` и `aggTrades` (мс) доступны за май 2026 и раньше. Вес видно в `x-mbx-used-weight-1m`.
-- Coinbase: 1m-свечи `BTC-USD` и т. д.
+- CLOB `prices-history`: шаг ~60 с. Теперь есть и `GET /v2/prices-history` на data-хосте (`bucket_seconds` от 60, `as_of`) [docs].
+  После резолва `/book` возвращает 404: **исторического стакана нет**, только live-снимки этапа 3.
+- CLOB `/price?side=BUY` возвращает **лучший bid**, `side=SELL` — лучший ask. Проверено против `/book`; это противоречит гайду `agent-skills`.
+- Книга: `bids` по возрастанию, `asks` по убыванию (лучшие цены в конце), `timestamp` в мс.
+- Binance `data-api.binance.vision`: 1s klines и aggTrades (мс) доступны с мая 2026. Coinbase: 1m-свечи.
 
-## 7. Расхождения с наблюдениями в CLAUDE.md и сомнения
+## 7. Сверка с наблюдениями в CLAUDE.md
 
-1. **Главное: не проверены** ~89.6K сделок, $20.6M, +$347K, доля парных позиций и пр. Data API закрыт.
-   Из доступного: профиль создан 2026-05-21 (сходится с «с мая»), `name: bosona`, taker-тир Gold.
-2. Список рынков шире, чем в CLAUDE.md: есть ещё **4h**, а также **HYPE и ZEC**. Что из этого торгует он, станет видно по данным.
-3. Правила 5m/15m/4h **изменились в середине его истории** (07.08 и 14.08). Смешивать периоды в одной статистике нельзя.
-4. Торги по окну открыты за ~24 ч до его начала, так что «секунды от открытия окна» бывают отрицательными.
-5. Комиссии существенны (до 3.5% номинала у taker около 50¢) и менялись во времени. PnL и EV считать по фактическим `fee` из on-chain.
-6. Tick size динамический: 0.01 в середине и 0.001 у краёв. Это важно для моделирования исполнения по 0.99.
-7. У части старых событий в Gamma висит `closed=false` (например, `btc-updown-5m-1766162100` декабря 2025). При выборках фильтровать по `endDate`, а не только по `closed`.
+| В CLAUDE.md | Факт [live] |
+|---|---|
+| «с мая 2026» | профиль создан 2026-05-21, **первая сделка 2026-06-02 21:34 UTC** |
+| «~89.6K сделок» | **89 590 — число рынков** (`/v2/user-stats.trades`, v1 `/traded` = 90 258). **Сделок (fills) 540 004–544 939** |
+| «объём ~$20.6M» | **20.69M shares**; в USDC **$10.40M** (`volume_usdc`) |
+| «PnL ~+$347K» | ✅ `trade_pnl` $348 746; `economic_pnl` $355 766 (с ребейтами и наградами); `realized_market_pnl` $312 524 |
+| «~1.7% от оборота» | 1.69% от **shares**; от USDC-оборота **3.35%** |
+| почти только крипто Up/Down | ✅ (срез 27.09: 100% крипто Up/Down) |
+| BTC, ETH, SOL, XRP, DOGE, BNB | ✅ 27.09: BTC 85%, ETH 7.1%, SOL 4.4%, BNB 1.5%, DOGE 1.4%, XRP 0.9%. HYPE/ZEC не было |
+| окна 5m, 15m, 1h, daily | ✅ плюс **4h**. 27.09: 5m 61%, 15m 26%, 1h 8.9%, daily 2.3%, 4h 1.4% |
+| держит обе стороны | ✅ 27.09: в 48% рынков покупал и Up, и Down |
+| — | **SELL нет вообще** (0 за всю историю): выход через MERGE и REDEEM |
+| — | **~91% fills maker** (27.09; по USDC ~80%) и крупные maker rebates, по предварительным данным это маркет-мейкер |
 
----
+Срезы за 27.09 — одна выборка-сутки. Полная статистика будет на этапах 1 и 4.
 
 ## 8. Предложение схемы БД (SQLite, `data/bosona.db`)
 
 Принципы:
 
-- суммы храним в целых базовых единицах (1e6) плюс `REAL` для удобства;
-- «сырые» ответы храним как JSON, чтобы можно было перепарсить;
-- каждая таблица имеет естественный ключ дедупликации;
-- `sync_state` делает выгрузку идемпотентной.
+- суммы храним целыми в 1e6 и параллельно в `REAL`;
+- сырой JSON строки храним;
+- у каждой таблицы естественный ключ;
+- докачка с перекрытием и `INSERT OR IGNORE`.
 
 ```sql
--- Рынки (одна строка на conditionId)
 CREATE TABLE markets (
-  condition_id        TEXT PRIMARY KEY,          -- 0x…
+  condition_id        TEXT PRIMARY KEY,
   slug                TEXT NOT NULL UNIQUE,
-  event_slug          TEXT, series_slug TEXT,
+  event_slug TEXT, series_slug TEXT, question_id TEXT,
   asset               TEXT NOT NULL,             -- btc|eth|sol|xrp|doge|bnb|hype|zec
   timeframe           TEXT NOT NULL,             -- 5m|15m|1h|4h|1d
-  window_start_ts     INTEGER NOT NULL,          -- eventStartTime, unix сек
+  window_start_ts     INTEGER NOT NULL,          -- eventStartTime
   window_end_ts       INTEGER NOT NULL,          -- endDate
   accepting_orders_ts INTEGER,                   -- ~за 24 ч до окна
-  up_token_id         TEXT NOT NULL, down_token_id TEXT NOT NULL,
+  up_token_id TEXT NOT NULL, down_token_id TEXT NOT NULL,
   resolution_regime   TEXT NOT NULL,             -- chainlink_spot|chainlink_twap30|chainlink_twap60|binance_1h|binance_noon_1m
-  resolution_source   TEXT, crypto_config_id TEXT, twap_lookback_s INTEGER,
+  resolution_source TEXT, crypto_config_id TEXT, twap_lookback_s INTEGER,
   fee_type TEXT, fee_rate REAL, fee_exponent REAL, fee_taker_only INTEGER, fee_rebate_rate REAL,
   order_min_size REAL, tick_size_last REAL, neg_risk INTEGER,
-  raw_json            TEXT NOT NULL, fetched_at INTEGER NOT NULL
+  raw_json TEXT NOT NULL, fetched_at INTEGER NOT NULL
 );
 CREATE INDEX ix_markets_asset_tf_start ON markets(asset, timeframe, window_start_ts);
 
--- Итоги рынков
 CREATE TABLE resolutions (
   condition_id   TEXT PRIMARY KEY REFERENCES markets(condition_id),
-  winner         TEXT,                           -- Up|Down|50-50|NULL (не резолвлен)
-  payout_up REAL, payout_down REAL,              -- из outcomePrices
-  price_to_beat  REAL, final_price REAL,         -- strike / итог
+  winner         TEXT,                           -- Up|Down|50-50|NULL
+  payout_up REAL, payout_down REAL,
+  price_to_beat  REAL, final_price REAL,
   strike_source  TEXT,                           -- gamma_meta|chained|binance_kline|proxy
-  closed_ts      INTEGER, uma_status TEXT, fetched_at INTEGER NOT NULL
+  closed_ts INTEGER, uma_status TEXT, fetched_at INTEGER NOT NULL
 );
 
--- Сделки (fills) @bosona: канонический слой
+-- Fills @bosona (все BUY на сегодня, но SELL поддерживаем)
 CREATE TABLE trades (
-  trade_uid     TEXT PRIMARY KEY,   -- '{tx}:{logIndex}' если on-chain; иначе 'api:{tx}:{asset}:{side}:{size_raw}:{price}:{seq}'
-  tx_hash       TEXT NOT NULL,
-  log_index     INTEGER,            -- из OrderFilled (NULL, пока только Data API)
-  block_number  INTEGER,
-  ts            INTEGER NOT NULL,   -- unix сек (время блока)
-  order_ts_ms   INTEGER,            -- Order.timestamp из calldata (мс), если достанем
-  condition_id  TEXT NOT NULL REFERENCES markets(condition_id),
-  asset         TEXT NOT NULL,      -- token id
-  outcome       TEXT NOT NULL,      -- Up|Down
-  side          TEXT NOT NULL,      -- BUY|SELL
-  price         REAL NOT NULL,
-  size_raw      INTEGER NOT NULL,   -- shares * 1e6
-  usdc_raw      INTEGER NOT NULL,   -- pUSD * 1e6
-  fee_raw       INTEGER,            -- OrderFilled.fee
-  role          TEXT,               -- maker|taker|NULL
-  order_hash    TEXT, counterparty TEXT,
-  source        TEXT NOT NULL,      -- data_api|chain|both
-  raw_json      TEXT, ingested_at INTEGER NOT NULL,
-  UNIQUE (tx_hash, log_index)
+  trade_uid    TEXT PRIMARY KEY,   -- '{tx}:{token}:{side}:{size_raw}:{price_raw}:{seq}'  (seq — № среди одинаковых строк tx)
+  tx_hash      TEXT NOT NULL,
+  ts           INTEGER NOT NULL,   -- время блока, сек
+  condition_id TEXT NOT NULL,
+  token_id     TEXT NOT NULL,
+  outcome      TEXT NOT NULL,      -- Up|Down
+  outcome_index INTEGER,
+  side         TEXT NOT NULL,      -- BUY|SELL
+  price        REAL NOT NULL,      -- usdc/size (может быть «нецелым» тиком)
+  size_raw     INTEGER NOT NULL,   -- shares*1e6
+  usdc_raw     INTEGER NOT NULL,   -- usdc*1e6
+  role         TEXT,               -- taker|maker (из разности taker_only=true/false)
+  fee_usdc     REAL,               -- taker: C*rate*p*(1-p), maker: 0; позже заменяется on-chain fee
+  log_index INTEGER, block_number INTEGER, order_ts_ms INTEGER,   -- заполняются, если появится RPC
+  source       TEXT NOT NULL,      -- data_api_v2|chain|both
+  raw_json     TEXT NOT NULL, ingested_at INTEGER NOT NULL
 );
 CREATE INDEX ix_trades_cond_ts ON trades(condition_id, ts);
 CREATE INDEX ix_trades_ts ON trades(ts);
+CREATE UNIQUE INDEX ux_trades_chain ON trades(tx_hash, log_index) WHERE log_index IS NOT NULL;
 
--- Не-торговая активность: SPLIT/MERGE/REDEEM/REWARD/CONVERSION/YIELD/MAKER_REBATE
+-- Остальная активность: MERGE/REDEEM/SPLIT/REWARD/MAKER_REBATE/TAKER_REBATE/… (тип — свободная строка)
 CREATE TABLE activity (
-  activity_uid  TEXT PRIMARY KEY,   -- '{tx}:{type}:{condition_id}:{asset}:{seq}'
+  activity_uid TEXT PRIMARY KEY,   -- '{tx}:{type}:{condition_id}:{token_id}:{seq}'
   tx_hash TEXT NOT NULL, ts INTEGER NOT NULL, type TEXT NOT NULL,
-  condition_id TEXT, asset TEXT, outcome_index INTEGER,
-  size REAL, usdc_size REAL, price REAL,
+  condition_id TEXT, token_id TEXT, outcome TEXT, outcome_index INTEGER,
+  size REAL, usdc_size REAL,
   raw_json TEXT NOT NULL, ingested_at INTEGER NOT NULL
 );
 CREATE INDEX ix_activity_cond ON activity(condition_id, ts);
@@ -384,43 +416,37 @@ CREATE INDEX ix_activity_cond ON activity(condition_id, ts);
 -- Контекст на момент сделки (этап 2)
 CREATE TABLE market_context (
   trade_uid TEXT PRIMARY KEY REFERENCES trades(trade_uid),
-  secs_from_open INTEGER, secs_to_close INTEGER,      -- может быть <0 (вход до окна)
+  secs_from_open INTEGER, secs_to_close INTEGER,      -- может быть < 0
   strike REAL, strike_source TEXT,
-  spot REAL, spot_source TEXT,                        -- coinbase_1m|binance_1s_adj|chainlink_rtds
-  dist_bps REAL,                                      -- (spot/strike-1)*1e4
-  vol_1m REAL, vol_5m REAL, vol_15m REAL,             -- реализованная вола спота до сделки
-  up_mid REAL, down_mid REAL, pair_mid REAL,          -- из prices-history (~1 мин) или снимков
+  spot REAL, spot_source TEXT, dist_bps REAL,
+  vol_1m REAL, vol_5m REAL, vol_15m REAL,
+  up_mid REAL, down_mid REAL, pair_mid REAL,
   up_bid REAL, up_ask REAL, down_bid REAL, down_ask REAL, book_source TEXT, book_age_ms INTEGER,
   computed_at INTEGER NOT NULL
 );
 
--- Кэши внешних рядов
-CREATE TABLE spot_bars (
-  source TEXT, symbol TEXT, interval TEXT, open_ts_ms INTEGER,
-  o REAL, h REAL, l REAL, c REAL, v REAL,
-  PRIMARY KEY (source, symbol, interval, open_ts_ms)
-);
+-- Сверка PnL и позиции (из v2)
+CREATE TABLE pnl_daily (ts INTEGER PRIMARY KEY, source_block INTEGER, trade_pnl REAL, realized_market_pnl REAL,
+  fees_paid REAL, maker_rebate REAL, taker_rebate REAL, reward_income REAL, economic_pnl REAL,
+  volume REAL, volume_usdc REAL, trade_count INTEGER, raw_json TEXT);
+CREATE TABLE positions (token_id TEXT PRIMARY KEY, condition_id TEXT, status TEXT, total_size REAL, avg_price REAL,
+  entry_fees_usdc REAL, realized_pnl REAL, last_event_at INTEGER, raw_json TEXT, fetched_at INTEGER);
+
+-- Кэши внешних рядов и состояние выгрузки
+CREATE TABLE spot_bars (source TEXT, symbol TEXT, interval TEXT, open_ts_ms INTEGER,
+  o REAL, h REAL, l REAL, c REAL, v REAL, PRIMARY KEY (source, symbol, interval, open_ts_ms));
 CREATE TABLE clob_price_history (token_id TEXT, t INTEGER, p REAL, PRIMARY KEY (token_id, t));
-
--- Состояние выгрузки (идемпотентность / докачка)
-CREATE TABLE sync_state (
-  source TEXT, scope TEXT,           -- напр. ('data_api.activity','0xc2ad…'), ('chain.orderfilled','maker')
-  cursor TEXT, last_ts INTEGER, last_block INTEGER, updated_at INTEGER,
-  PRIMARY KEY (source, scope)
-);
-
--- Сверка PnL с Data API (снимки)
-CREATE TABLE positions_snapshot (snap_ts INTEGER, asset TEXT, condition_id TEXT, raw_json TEXT, PRIMARY KEY (snap_ts, asset));
-CREATE TABLE closed_positions   (asset TEXT PRIMARY KEY, condition_id TEXT, realized_pnl REAL, avg_price REAL, total_bought REAL, ts INTEGER, raw_json TEXT);
+CREATE TABLE sync_state (source TEXT, scope TEXT, last_ts INTEGER, updated_at INTEGER, note TEXT,
+  PRIMARY KEY (source, scope));
 
 -- Этап 3 (позже): book_snapshots(token_id, ts_ms, recv_ms, bids_json, asks_json, hash),
 --                 detections(trade_uid, block_ts, detected_ms, latency_ms, spot_at_detect, mid_at_detect)
 ```
 
-Дедупликация:
+Контроль полноты после выгрузки:
 
-- канонический ключ fill'а — `(tx_hash, log_index)` из `OrderFilled`;
-- пока on-chain недоступен, строки Data API получают синтетический `trade_uid` с `seq`, порядковым номером среди полностью одинаковых строк одного tx;
-- при появлении on-chain строки сливаем по `(tx_hash, asset, side, size_raw)` и проставляем `log_index`, `role`, `fee_raw`, `source='both'`.
+- `COUNT(trades)` против `/v2/user-volume.trade_count`;
+- `SUM(fee_usdc)` против `fees_paid`;
+- поденный PnL против `pnl_daily`.
 
-Эпизоды для этапа 4 — это `VIEW` поверх `trades` с группировкой по `condition_id`.
+Эпизоды для этапа 4 — это `VIEW` поверх `trades` и `activity` с группировкой по `condition_id`.

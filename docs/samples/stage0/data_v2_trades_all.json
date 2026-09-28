@@ -1,0 +1,56 @@
+{
+ "_request": "GET /v2/trades?user=0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed&limit=2&taker_only=false",
+ "_fetched_at": "2026-09-28T18:30Z",
+ "response": {
+  "data": [
+   {
+    "proxy_wallet": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+    "side": "BUY",
+    "token_id": "84757366440098301426530610616217983251057323529958745541991207115084628755708",
+    "condition_id": "0x70cd1632e0469a457fa385f00f241911493a293faeb22ec0a0fe023d661b3d8b",
+    "size": 10.294118,
+    "price": 0.3200000233,
+    "timestamp": 1790620238,
+    "title": "Bitcoin Up or Down - September 28, 2:30PM-2:35PM ET",
+    "slug": "btc-updown-5m-1790620200",
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/BTC+fullsize.png",
+    "event_slug": "btc-updown-5m-1790620200",
+    "outcome": "Up",
+    "outcome_index": 0,
+    "name": "bosona",
+    "pseudonym": "Impolite-Sister",
+    "bio": "",
+    "profile_image": "",
+    "profile_image_optimized": "",
+    "transaction_hash": "0xa4a199d1eba705835fa9241c9519c33cbd56c31be9cfb87863a75070f15f4240"
+   },
+   {
+    "proxy_wallet": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+    "side": "BUY",
+    "token_id": "87378234650055540935470495291045092567587444793277575994368171700863579455312",
+    "condition_id": "0x968aa5e188a733a873ba95e738620534a6e5af0b6f51d9b09239dc0557af2895",
+    "size": 199.372308,
+    "price": 0.7400000004,
+    "timestamp": 1790620118,
+    "title": "Bitcoin Up or Down - September 28, 2:15PM-2:30PM ET",
+    "slug": "btc-updown-15m-1790619300",
+    "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/BTC+fullsize.png",
+    "event_slug": "btc-updown-15m-1790619300",
+    "outcome": "Down",
+    "outcome_index": 1,
+    "name": "bosona",
+    "pseudonym": "Impolite-Sister",
+    "bio": "",
+    "profile_image": "",
+    "profile_image_optimized": "",
+    "transaction_hash": "0xcfbc00ffd3ae55b78bf49b9716375f608099a8183fb4ac931f00b5bb158a94d1"
+   }
+  ],
+  "pagination": {
+   "limit": 2,
+   "offset": 0,
+   "has_more": true,
+   "next_cursor": "eyJkYXRhIjp7InR5cGUiOiJ0cmFkZXMiLCJwYXJhbXMiOnsibCI6MiwidHMiOjE3OTA2MjAxMTgsInNxIjoiOTQ2MDk5ODUwMDA0MTA1ODgwIiwiZCI6Mn19LCJzaWciOiIwOTdiNzliMTBjYzE0MDhlODAyZjliMTk1ZTlmNzU2NyJ9"
+  }
+ }
+}
