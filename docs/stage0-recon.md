@@ -17,6 +17,7 @@
    - Data API v1 упирается в offset 5000 и **выключается 24.10.2026**.
 2. **Роль maker/taker определяется без блокчейна.** `/v2/trades?taker_only=true` возвращает ровно его taker-fills, а разница с `taker_only=false` — это maker-fills.
    Комиссия считается по формуле. Проверено до цента против `entry_fees_usdc` и `fees_paid`.
+   **Подтверждено on-chain:** за час 129/129 fills совпали с `OrderFilled`, включая роль (16 taker) и комиссии ($11.48232 против $11.48237 по формуле).
 3. **Данные противоречат CLAUDE.md в трёх местах** (§7):
    - «89.6K сделок» — это 89 590 **рынков**, а сделок ~540K;
    - «$20.6M» — это 20.6M **shares**, а в USDC ~$10.4M;
@@ -40,12 +41,13 @@
 | `clob.polymarket.com` (REST) | ✅ 200 | книга, цены, tick/fee |
 | `data-api.binance.vision` | ✅ 200 | Binance spot klines 1s / aggTrades |
 | `api.exchange.coinbase.com` | ✅ 200 | Coinbase BTC-USD (лучший прокси Chainlink, §4.4) |
+| `polygon-bor-rpc.publicnode.com` | ✅ 200 (открыт) | on-chain сверка, `eth_getLogs` **≤ 10 000 блоков** за запрос (§2.4) |
 | `polygon-rpc.com` | ⚠️ сеть открыта, но RPC отвечает `401 "API key disabled, reason: tenant disabled"` | анонимный доступ больше не работает |
-| прочие Polygon RPC (`polygon-bor-rpc.publicnode.com`, `polygon.drpc.org`, `1rpc.io`, ankr), polygonscan | ❌ 403 от прокси | on-chain сверка (опционально, §2.4) |
+| прочие Polygon RPC (`polygon.drpc.org`, `1rpc.io`, ankr), polygonscan | ❌ 403 от прокси | не нужны |
 | `ws-live-data.polymarket.com`, `ws-subscriptions-clob.polymarket.com`, `data-stream.binance.vision` | ❌ 403 | понадобятся на этапе 3 |
 | `api.binance.com` | ⚠️ 451 (гео-блок) | заменяется `data-api.binance.vision` |
 
-Для on-chain сверки (logIndex, мс-время ордеров) нужен рабочий RPC, например `polygon-bor-rpc.publicnode.com`. Для этапа 1 он **не обязателен**, см. §1.6.
+On-chain источник работает через `polygon-bor-rpc.publicnode.com`. Для этапа 1 он **не обязателен** (§1.6), но даёт `logIndex`, размеры и лимит-цены его ордеров и независимую сверку (§2.4).
 
 ---
 
@@ -107,10 +109,12 @@ Rate limits [docs `api-reference/rate-limits`]:
 
 ### 1.5 Точность времени
 
-- `timestamp` — это **время блока в секундах** [docs OpenAPI].
-- Блок Polygon ≈ **1.5 с**: оценка по `source_block` в `/v2/user-pnl`, 6.73M блоков за 10.1M с.
+- `timestamp` — это **время блока в секундах** [docs OpenAPI]. Совпадает с `block.timestamp` соответствующих tx [live, RPC].
+- Блок Polygon — **ровно 1.5 с** (2 400 блоков за час 27.09 16–17 UTC).
 - Порядок внутри блока в API не восстановить: нужен on-chain `logIndex`.
-- Реальное время решения бота (мс) есть только в подписанном ордере V2 (`Order.timestamp`, calldata) [src].
+- Мс-времени решений @bosona **нет нигде**. В V2 ордер подписывается с полем `timestamp` (мс) [src], но в calldata `matchOrders` у всех его ордеров `timestamp = 0` [live].
+  Другие участники поле почти всегда заполняют: 56 из 57 чужих ордеров в двух проверенных tx, медианный лаг «блок − ордер» 2.8 с и 8.5 с.
+  Значит, латентность его бота напрямую не измерить. Только косвенно, по споту (гипотеза 3) и по live-трекеру (этап 3).
 
 ### 1.6 Роль maker/taker без блокчейна ([live])
 
@@ -125,10 +129,14 @@ Rate limits [docs `api-reference/rate-limits`]:
 
 Роль = разность мультимножеств по ключу `(tx, token, side, size, price)`.
 
+**On-chain подтверждение** [live, RPC]: `eth_getLogs(OrderFilled, topic2 = bosona)` за то же окно (блоки 94 546 440–94 548 839) дал 129 событий, из них 16 с `taker = адрес биржи`.
+Мультимножества `(token, size)` совпали с API и для всех fills, и для taker-подмножества.
+
 ### 1.7 Дубликаты ([live])
 
 За сутки нашлось 3 пары **полностью одинаковых строк** в одной tx, например `0xc12bff…: BUY 249 @ 0.97 Down` ×2.
 Обе строки — maker-fills (в `taker_only=true` их 0), то есть это два реальных fill'а, а не повтор API.
+On-chain это два отдельных `OrderFilled` (logIndex 607 и 611) от двух разных ордеров по 249 @ 0.97, оба исполнены целиком.
 
 Поэтому ключ дедупликации без `log_index` обязан включать порядковый номер `seq` среди одинаковых строк tx.
 Все строки tx имеют одинаковый `timestamp`, так что при окнах, целиком покрывающих секунду tx, `seq` стабилен.
@@ -173,23 +181,45 @@ Rate limits [docs `api-reference/rate-limits`]:
 
 ### 2.4 Запасной и проверочный источник: on-chain `OrderFilled` (CLOB V2)
 
-Статус: не проверено живьём, потому что нет рабочего RPC (§0). Для этапа 1 не обязателен: роль и комиссия уже есть из API.
-Нужен для трёх вещей: `log_index`, мс-времени ордеров и независимой сверки.
+Статус: **проверено** [live] через `polygon-bor-rpc.publicnode.com`, декодированные примеры лежат в `chain_orderfilled_samples.json`.
+Для этапа 1 не обязателен, потому что роль и комиссия уже есть из API. Полезен для трёх вещей:
+
+- `log_index` (точный ключ и порядок внутри блока);
+- **параметры его ордеров из calldata** `matchOrders` (selector `0x3c2b4399`): размер и лимит-цена ордера, частичные исполнения, `orderHash` для склейки fill'ов одного ордера;
+- независимая сверка API.
+
+**Контракты и событие.**
 
 - CLOB V2 работает с **2026-04-28 ~11:00 UTC** [docs changelog], так что вся история @bosona на V2.
 - Адреса [docs `resources/contracts`, «single source of truth»]:
-  - CTF Exchange `0xE111180000d2663C0091e4f400237545B87B996B` (Up/Down, `negRisk=false`);
+  - CTF Exchange `0xE111180000d2663C0091e4f400237545B87B996B` (Up/Down, `negRisk=false`; все проверенные tx идут сюда);
   - Neg Risk CTF Exchange `0xe2222d279d744050d28e00520010520000310F59`;
   - Conditional Tokens `0x4D97DCd97eC945f40cF65F87097ACe5EA0476045`;
   - pUSD `0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB`;
   - CtfCollateralAdapter `0xAdA100Db00Ca00073811820692005400218FcE1f`. В README ctf-exchange-v2 указан другой адрес, `0xADa100874d00e3331D00F2007a9c336a65009718`: адаптер передеплоили, учитывать оба.
 - Событие [src `ITrading.sol`]: `OrderFilled(bytes32 indexed orderHash, address indexed maker, address indexed taker, uint8 side, uint256 tokenId, uint256 makerAmountFilled, uint256 takerAmountFilled, uint256 fee, bytes32 builder, bytes32 metadata)`, topic0 `0xd543adfd945773f1a62f74f0ee55a5e3b9b1a28262980ba90b1a89f2ea84d8ee`.
-- Роль [src `Trading.sol`]:
+  Суммы в 6 знаках. BUY: `makerAmountFilled` = pUSD, `takerAmountFilled` = токены. SELL наоборот.
+- Роль [src `Trading.sol`, подтверждено live]:
   - maker-ордер эмитит `OrderFilled(maker = его владелец, taker = владелец taker-ордера)`;
-  - taker-ордер эмитит `OrderFilled(maker = владелец taker-ордера, taker = адрес биржи)` + `OrdersMatched`.
-  - Значит, фильтр `topic2 == bosona`: при `topic3 == биржа` он taker, иначе maker.
+  - taker-ордер эмитит `OrderFilled(maker = владелец taker-ордера, taker = адрес биржи)` + `OrdersMatched`;
+  - значит, фильтр `topic2 == bosona`: при `topic3 == биржа` он taker, иначе maker.
 - Split/merge/redeem идут через адаптер. Своих событий нет, видны как ERC-1155 `TransferBatch` на CTF.
-- В 2026 есть и альтернативы: Goldsky pipelines, Dune, Allium [docs `resources/blockchain-data`]. Старый subgraph после V2 неполный [web].
+
+**Что показала проверка** (tx `0x63326de7…`, `0x0780d41f…`, `0xc12bff78…` и час 27.09 16–17 UTC):
+
+- 129/129 fills совпали с API, включая роль. `block.timestamp` = `timestamp` API.
+- `fee` его taker-fill'а `108 @ 0.36` равен `1.741820`, это ровно `108 × 0.07 × 0.36 × 0.64`. У maker-fill'ов `fee = 0`.
+- Его ордера подписаны `signatureType = 3` (POLY_1271), `signer` = сам proxy wallet. `Order.timestamp = 0` (§1.5).
+- Taker-ордер `BUY 123.55 @ 0.36` исполнился на 108 и прошёл 3 уровня.
+  Среди них встречная **покупка** противоположного токена: матч типа MINT, то есть пара Up+Down создаётся из коллатерала.
+- Maker-ордер `BUY 150 @ 0.74` исполнился на 84.12. «Дубликат» из API — это два разных ордера `249 @ 0.97`.
+
+**Лимиты и стоимость.**
+
+- `eth_getLogs` принимает не больше **10 000 блоков** за запрос (`-32701 exceed maximum block range`).
+- Его история — это блоки ~87.8M…94.6M, ~6.8M блоков. Получается ~680 запросов по 1–2 с, то есть **~15–20 мин** на все его `OrderFilled`.
+- Calldata нужна выборочно, по одному `eth_getTransactionByHash` на tx.
+- Альтернативы в 2026: Goldsky pipelines, Dune, Allium [docs `resources/blockchain-data`]. Старый subgraph после V2 неполный [web].
 
 ---
 
@@ -295,7 +325,8 @@ Binance 1s можно использовать с **поправкой на ба
 - **Сверка с его данными** [live]:
   - `entry_fees_usdc` 40 последних закрытых позиций: 37/40 совпали с формулой по его taker-fills до 5-го знака, у позиций только с maker-fills ровно 0;
   - 3 расхождения — позиции, у которых часть базиса списана при MERGE;
-  - дневные `fees_paid` за 27.09: $393.18 по `/v2/user-pnl` против $393.55 по формуле.
+  - дневные `fees_paid` за 27.09: $393.18 по `/v2/user-pnl` против $393.55 по формуле;
+  - on-chain `OrderFilled.fee` его taker-fills за час 27.09 16–17 UTC: $11.48232 против $11.48237 по формуле (расхождение только в округлении 5-го знака).
 - **Историческая ставка:** верхняя огибающая implied rate по позициям 04.06, 25.06, 13.07, 27.07 и 21.08 равна **ровно 0.0700**.
   Сторонняя статья про «0.072 → 0.07 в июле» [web] ни changelog'ом, ни данными не подтверждается.
 - **Taker delay** (задержка матчинга marketable-ордеров на крипто-рынках) [docs changelog]:
@@ -394,8 +425,9 @@ CREATE TABLE trades (
   size_raw     INTEGER NOT NULL,   -- shares*1e6
   usdc_raw     INTEGER NOT NULL,   -- usdc*1e6
   role         TEXT,               -- taker|maker (из разности taker_only=true/false)
-  fee_usdc     REAL,               -- taker: C*rate*p*(1-p), maker: 0; позже заменяется on-chain fee
-  log_index INTEGER, block_number INTEGER, order_ts_ms INTEGER,   -- заполняются, если появится RPC
+  fee_usdc     REAL,               -- taker: C*rate*p*(1-p), maker: 0; при наличии on-chain берём OrderFilled.fee
+  log_index INTEGER, block_number INTEGER,                        -- из OrderFilled (опционально)
+  order_hash TEXT, order_size REAL, order_limit_price REAL,       -- из calldata matchOrders (опционально); Order.timestamp у него всегда 0
   source       TEXT NOT NULL,      -- data_api_v2|chain|both
   raw_json     TEXT NOT NULL, ingested_at INTEGER NOT NULL
 );

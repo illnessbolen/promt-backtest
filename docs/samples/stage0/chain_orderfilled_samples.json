@@ -1,0 +1,232 @@
+{
+ "_request": "eth_getTransactionReceipt / eth_getTransactionByHash via https://polygon-bor-rpc.publicnode.com, decoded with ctf-exchange-v2 ABI",
+ "_fetched_at": "2026-09-28T18:43Z",
+ "response": {
+  "0x63326de78ac4221ae367baa510c24c1a2dcb6ac2b376f1a7fea259ffed609c2a": {
+   "note": "bosona TAKER: API row BUY 108 @0.36 Down btc-updown-15m-1790619300",
+   "block": 94609767,
+   "block_timestamp": 1790619791,
+   "tx_to": "0xe111180000d2663c0091e4f400237545b87b996b",
+   "orderfilled_involving_bosona": [
+    {
+     "orderHash": "0x5d2b7bcdbe5d5925979382d5a235299b143423d248c14dafe8f0759220ab84df",
+     "maker": "0x3b9e5de41d52ace48bb2baf8945c37392f28cb21",
+     "taker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "side": "SELL",
+     "tokenId": "87378234650055540935470495291045092567587444793277575994368171700863579455312",
+     "makerAmt": 7000000,
+     "takerAmt": 2520000,
+     "fee": 0,
+     "builder": "0x0",
+     "metadata": "0x0",
+     "logIndex": 778,
+     "address": "0xe111180000d2663c0091e4f400237545b87b996b",
+     "bosona_role": "counterparty-of-bosona-taker"
+    },
+    {
+     "orderHash": "0x767ca43cf5ebcdbfa5879875c429bac12ae8190169376ca86eb53db43e526db5",
+     "maker": "0x0cb038487586d1119b165466072e9baf666f3a90",
+     "taker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "side": "SELL",
+     "tokenId": "87378234650055540935470495291045092567587444793277575994368171700863579455312",
+     "makerAmt": 81000000,
+     "takerAmt": 29160000,
+     "fee": 0,
+     "builder": "0x0",
+     "metadata": "0x0",
+     "logIndex": 780,
+     "address": "0xe111180000d2663c0091e4f400237545b87b996b",
+     "bosona_role": "counterparty-of-bosona-taker"
+    },
+    {
+     "orderHash": "0x6b5c4b54ebce630b88482dba243a82f49074726f65ef311f63ad923133651f65",
+     "maker": "0xcfddfb6e1b321fcfdcb6f9aa09b11990142ce5da",
+     "taker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "side": "BUY",
+     "tokenId": "93335504323282352028767119845635840338634878270187352487756318246108664038949",
+     "makerAmt": 12800000,
+     "takerAmt": 20000000,
+     "fee": 0,
+     "builder": "0x0",
+     "metadata": "0x0",
+     "logIndex": 782,
+     "address": "0xe111180000d2663c0091e4f400237545b87b996b",
+     "bosona_role": "counterparty-of-bosona-taker"
+    },
+    {
+     "orderHash": "0x3798a7cbbabd12d70473d770c2abd8626caf489fbffe8d196c04d5143fc6ee1d",
+     "maker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "taker": "0xe111180000d2663c0091e4f400237545b87b996b",
+     "side": "BUY",
+     "tokenId": "87378234650055540935470495291045092567587444793277575994368171700863579455312",
+     "makerAmt": 38880000,
+     "takerAmt": 108000000,
+     "fee": 1741820,
+     "builder": "0x0",
+     "metadata": "0x0",
+     "logIndex": 786,
+     "address": "0xe111180000d2663c0091e4f400237545b87b996b",
+     "bosona_role": "taker"
+    }
+   ],
+   "raw_log_example": {
+    "address": "0xe111180000d2663c0091e4f400237545b87b996b",
+    "topics": [
+     "0xd543adfd945773f1a62f74f0ee55a5e3b9b1a28262980ba90b1a89f2ea84d8ee",
+     "0x3798a7cbbabd12d70473d770c2abd8626caf489fbffe8d196c04d5143fc6ee1d",
+     "0x000000000000000000000000c2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "0x000000000000000000000000e111180000d2663c0091e4f400237545b87b996b"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000000000000000000000c12e5406007fa63ab81789ff0733e7a01c457a19e6710da1295ca85d8547ff50000000000000000000000000000000000000000000000000000000000251430000000000000000000000000000000000000000000000000000000000066ff30000000000000000000000000000000000000000000000000000000000001a93fc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "logIndex": "0x312",
+    "blockNumber": "0x5a3a167",
+    "transactionHash": "0x63326de78ac4221ae367baa510c24c1a2dcb6ac2b376f1a7fea259ffed609c2a"
+   },
+   "bosona_orders_from_calldata(matchOrders 0x3c2b4399)": [
+    {
+     "role": "taker",
+     "maker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "signer": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "tokenId": "87378234650055540935470495291045092567587444793277575994368171700863579455312",
+     "makerAmount": 44478000,
+     "takerAmount": 123550000,
+     "side": "BUY",
+     "sigType": 3,
+     "order_ts_ms": 0,
+     "fill": 38880000,
+     "fee": 1741820
+    }
+   ]
+  },
+  "0x0780d41fcc2b780300da754f0b78254a94a4ddf0ebc2e48a3ead0bb1f9fe4298": {
+   "note": "bosona MAKER: API row BUY 84.115385 @0.74 Up eth-updown-5m-1790619600",
+   "block": 94609816,
+   "block_timestamp": 1790619864,
+   "tx_to": "0xe111180000d2663c0091e4f400237545b87b996b",
+   "orderfilled_involving_bosona": [
+    {
+     "orderHash": "0xb39b4d86236d12ff7e01238a25de8c9d7d5984081f7ddd05a1a16e96ad3f48da",
+     "maker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "taker": "0x044736c05d04d998ce20473a04ced1f64684d546",
+     "side": "BUY",
+     "tokenId": "101717076829807978296348319457078009928293520357442119119933128395923422768447",
+     "makerAmt": 62245385,
+     "takerAmt": 84115385,
+     "fee": 0,
+     "builder": "0x0",
+     "metadata": "0x0",
+     "logIndex": 484,
+     "address": "0xe111180000d2663c0091e4f400237545b87b996b",
+     "bosona_role": "maker"
+    }
+   ],
+   "raw_log_example": {
+    "address": "0xe111180000d2663c0091e4f400237545b87b996b",
+    "topics": [
+     "0xd543adfd945773f1a62f74f0ee55a5e3b9b1a28262980ba90b1a89f2ea84d8ee",
+     "0xb39b4d86236d12ff7e01238a25de8c9d7d5984081f7ddd05a1a16e96ad3f48da",
+     "0x000000000000000000000000c2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "0x000000000000000000000000044736c05d04d998ce20473a04ced1f64684d546"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000000000000000000000e0e1d3461218938299beff5ab3e2daf3c1c9ddfef97de6c09dae8c0eb10ced3f0000000000000000000000000000000000000000000000000000000003b5ca090000000000000000000000000000000000000000000000000000000005037fb9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "logIndex": "0x1e4",
+    "blockNumber": "0x5a3a198",
+    "transactionHash": "0x0780d41fcc2b780300da754f0b78254a94a4ddf0ebc2e48a3ead0bb1f9fe4298"
+   },
+   "bosona_orders_from_calldata(matchOrders 0x3c2b4399)": [
+    {
+     "role": "maker",
+     "maker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "signer": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "tokenId": "101717076829807978296348319457078009928293520357442119119933128395923422768447",
+     "makerAmount": 111000000,
+     "takerAmount": 150000000,
+     "side": "BUY",
+     "sigType": 3,
+     "order_ts_ms": 0,
+     "fill": 62245385,
+     "fee": 0
+    }
+   ]
+  },
+  "0xc12bff78413d75398bafabdaa5f69b37065579bc6e30fa43c5bf00e5c25eba9b": {
+   "note": "two identical API rows BUY 249 @0.97 = two separate maker fills",
+   "block": 94542407,
+   "block_timestamp": 1790518751,
+   "tx_to": "0xe111180000d2663c0091e4f400237545b87b996b",
+   "orderfilled_involving_bosona": [
+    {
+     "orderHash": "0xf183e726c8d8449ffd8eb9a979fb4e14ed02f8bf8da48fe23e285b3843f8e64f",
+     "maker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "taker": "0x48b8b4d9563ffde9e829caa92874aecc829afb3e",
+     "side": "BUY",
+     "tokenId": "96064006714668132699612746433419637832779888596845530684161490102888979303831",
+     "makerAmt": 241530000,
+     "takerAmt": 249000000,
+     "fee": 0,
+     "builder": "0x0",
+     "metadata": "0x0",
+     "logIndex": 607,
+     "address": "0xe111180000d2663c0091e4f400237545b87b996b",
+     "bosona_role": "maker"
+    },
+    {
+     "orderHash": "0xccb06e9be0eb720b49a87a0fb8ac4a31509c52bfafabd87f65d9ee1783734b71",
+     "maker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "taker": "0x48b8b4d9563ffde9e829caa92874aecc829afb3e",
+     "side": "BUY",
+     "tokenId": "96064006714668132699612746433419637832779888596845530684161490102888979303831",
+     "makerAmt": 241530000,
+     "takerAmt": 249000000,
+     "fee": 0,
+     "builder": "0x0",
+     "metadata": "0x0",
+     "logIndex": 611,
+     "address": "0xe111180000d2663c0091e4f400237545b87b996b",
+     "bosona_role": "maker"
+    }
+   ],
+   "raw_log_example": {
+    "address": "0xe111180000d2663c0091e4f400237545b87b996b",
+    "topics": [
+     "0xd543adfd945773f1a62f74f0ee55a5e3b9b1a28262980ba90b1a89f2ea84d8ee",
+     "0xf183e726c8d8449ffd8eb9a979fb4e14ed02f8bf8da48fe23e285b3843f8e64f",
+     "0x000000000000000000000000c2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "0x00000000000000000000000048b8b4d9563ffde9e829caa92874aecc829afb3e"
+    ],
+    "data": "0x0000000000000000000000000000000000000000000000000000000000000000d4624d0da84165404f7089a09b7d64fcfdaa2882eb92ec7a0594fc644c650d97000000000000000000000000000000000000000000000000000000000e657490000000000000000000000000000000000000000000000000000000000ed77040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "logIndex": "0x25f",
+    "blockNumber": "0x5a29a47",
+    "transactionHash": "0xc12bff78413d75398bafabdaa5f69b37065579bc6e30fa43c5bf00e5c25eba9b"
+   },
+   "bosona_orders_from_calldata(matchOrders 0x3c2b4399)": [
+    {
+     "role": "maker",
+     "maker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "signer": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "tokenId": "96064006714668132699612746433419637832779888596845530684161490102888979303831",
+     "makerAmount": 241530000,
+     "takerAmount": 249000000,
+     "side": "BUY",
+     "sigType": 3,
+     "order_ts_ms": 0,
+     "fill": 241530000,
+     "fee": 0
+    },
+    {
+     "role": "maker",
+     "maker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "signer": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "tokenId": "96064006714668132699612746433419637832779888596845530684161490102888979303831",
+     "makerAmount": 241530000,
+     "takerAmount": 249000000,
+     "side": "BUY",
+     "sigType": 3,
+     "order_ts_ms": 0,
+     "fill": 241530000,
+     "fee": 0
+    }
+   ]
+  }
+ }
+}
