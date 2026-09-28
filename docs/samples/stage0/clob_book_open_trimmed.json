@@ -1,0 +1,59 @@
+{
+ "_request": "GET https://clob.polymarket.com/book?token_id=111825179882834703843039071818388373049029341898733692783062443814635883590436  (market btc-updown-5m-1790619600)",
+ "_fetched_at": "2026-09-28T18:10Z",
+ "response": {
+  "market": "0x7ae38f368b4ef1b86857440cb0da261c31d556a83a5025f77d5476711666c2df",
+  "asset_id": "111825179882834703843039071818388373049029341898733692783062443814635883590436",
+  "timestamp": "1790619014171",
+  "hash": "c0adce0a26b0a73f0314c12a892b157a79694e8a",
+  "bids": [
+   {
+    "price": "0.46",
+    "size": "171"
+   },
+   {
+    "price": "0.47",
+    "size": "514.96"
+   },
+   {
+    "price": "0.48",
+    "size": "123.41"
+   },
+   {
+    "price": "0.49",
+    "size": "357.8"
+   },
+   {
+    "price": "0.5",
+    "size": "88.18"
+   }
+  ],
+  "asks": [
+   {
+    "price": "0.55",
+    "size": "205.1"
+   },
+   {
+    "price": "0.54",
+    "size": "271"
+   },
+   {
+    "price": "0.53",
+    "size": "374.96"
+   },
+   {
+    "price": "0.52",
+    "size": "123.41"
+   },
+   {
+    "price": "0.51",
+    "size": "251.52"
+   }
+  ],
+  "min_order_size": "5",
+  "tick_size": "0.01",
+  "neg_risk": false,
+  "last_trade_price": "0.490",
+  "_note": "trimmed: only 5 best levels kept per side; bids ascending (best last), asks descending (best last)"
+ }
+}

@@ -1,0 +1,31 @@
+{
+ "_request": "token_id=111825179882834703843039071818388373049029341898733692783062443814635883590436 (market btc-updown-5m-1790619600)",
+ "_fetched_at": "2026-09-28T18:10Z",
+ "response": {
+  "GET /price?side=BUY": {
+   "price": "0.5"
+  },
+  "GET /price?side=SELL": {
+   "price": "0.51"
+  },
+  "GET /midpoint": {
+   "mid": "0.505"
+  },
+  "GET /spread": {
+   "spread": "0.01"
+  },
+  "GET /last-trade-price": {
+   "price": "0.51",
+   "side": "BUY"
+  },
+  "GET /tick-size": {
+   "minimum_tick_size": 0.01
+  },
+  "GET /neg-risk": {
+   "neg_risk": false
+  },
+  "GET /fee-rate": {
+   "base_fee": 1000
+  }
+ }
+}
