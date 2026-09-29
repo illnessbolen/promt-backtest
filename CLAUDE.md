@@ -6,7 +6,7 @@
 
 ## Текущий статус
 
-Текущий этап: **1 — выгрузка истории** (этап 0 принят 2026-09-29, отчёт: `docs/stage0-recon.md`)
+Текущий этап: **2 — обогащение контекстом** (этап 1 принят 2026-09-29, отчёт: `docs/stage1-history.md`; этап 0: `docs/stage0-recon.md`)
 (обновляй эту строку после того, как я подтверждаю завершение этапа)
 
 ## Объект
@@ -132,5 +132,7 @@ python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'   # установ
 .venv/bin/python -m bosona sync --full     # перечитать всю историю заново (дубликатов не будет)
 .venv/bin/python -m bosona verify          # сверка с /v2/user-stats, /v2/user-volume, /v2/user-pnl
 .venv/bin/python -m bosona stats           # размеры таблиц
-.venv/bin/pytest                           # тесты парсинга и дедупликации
+.venv/bin/pytest                           # тесты парсинга, дедупликации и контекста
+.venv/bin/python -m bosona stage2          # этап 2: 1s-цены Binance + история цен токенов + контекст сделок
+.venv/bin/python -m bosona validate        # этап 2: покрытие, точность прокси, сверка PnL
 ```

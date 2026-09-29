@@ -10,6 +10,8 @@ log_level: INFO
 api:
   data: https://data-api.polymarket.com
   gamma: https://gamma-api.polymarket.com
+  clob: https://clob.polymarket.com
+  binance: https://data-api.binance.vision     # market-data-only mirror (api.binance.com is geo-blocked from some regions)
 
 http:
   timeout_s: 30
@@ -24,6 +26,8 @@ http:
 rate_limits:
   data-api.polymarket.com: 8
   gamma-api.polymarket.com: 12
+  clob.polymarket.com: 40         # /prices-history: 1000 req / 10 s documented
+  data-api.binance.vision: 30     # klines weight 2, 6000 weight / min per IP
 
 sync:
   history_start: 1          # /v2 feeds: start=1 means "full history" (0 would floor to 3 years back)
@@ -36,3 +40,13 @@ sync:
 
 fees:
   crypto_rate: 0.07         # fee = size * rate * p * (1 - p), takers only (docs.polymarket.com/trading/fees)
+
+spot:
+  cache_dir: data/spot            # Binance 1s closes, one .npz per symbol-day
+  concurrency: 12                 # symbol-days fetched in parallel
+  lookback_s: 1200                # history needed before each window (15-min volatility + TWAP margin)
+
+prices:
+  concurrency: 16                 # CLOB /prices-history requests in flight
+  pre_window_s: 300               # token price history fetched for [window_start - pre, window_end + post]
+  post_window_s: 120

@@ -6,6 +6,7 @@ It uses only public sources: Polymarket Data API v2, Gamma, the public CLOB and 
 
 - Stage 0 reconnaissance report: [`docs/stage0-recon.md`](docs/stage0-recon.md)
 - Stage 1 report: [`docs/stage1-history.md`](docs/stage1-history.md)
+- Stage 2 report: [`docs/stage2-context.md`](docs/stage2-context.md)
 - Project plan and open questions: [`CLAUDE.md`](CLAUDE.md)
 
 ## Install
@@ -26,7 +27,14 @@ cp .env.example .env        # optional, only for overrides; no secrets are neede
 .venv/bin/python -m bosona sync-markets   # Gamma metadata / resolutions for pending markets
 .venv/bin/python -m bosona verify         # reconcile with /v2/user-stats, /v2/user-volume, /v2/user-pnl
 .venv/bin/python -m bosona stats          # row counts
-.venv/bin/pytest                          # parsing and dedup tests
+.venv/bin/pytest                          # parsing, dedup and context tests
+
+# stage 2: market context of every fill
+.venv/bin/python -m bosona sync-spot      # Binance 1s closes for every traded window -> data/spot (~35 min first time, cached)
+.venv/bin/python -m bosona sync-prices    # CLOB price history of both tokens per market (~80 min first time, incremental)
+.venv/bin/python -m bosona enrich         # window_refs, market_context, episodes (full rebuild, ~2 min)
+.venv/bin/python -m bosona stage2         # the three steps above
+.venv/bin/python -m bosona validate       # coverage, proxy accuracy vs Chainlink strikes, PnL reconciliation
 ```
 
 Logs go to `logs/bosona.log` and stderr. Settings live in `config.yaml`, and `BOSONA_*` environment variables override them.
@@ -40,7 +48,11 @@ Logs go to `logs/bosona.log` and stderr. Settings live in `config.yaml`, and `BO
 | `activity` | every other `/v2/activity` row: MERGE, REDEEM (per outcome), REWARD, MAKER_REBATE, TAKER_REBATE, … | `tx:type:condition:token:size_raw:usdc_raw:seq` |
 | `markets`, `resolutions` | Gamma `/markets?condition_ids=…&closed=true` with the parent event embedded | `condition_id` |
 | `pnl_daily` | `/v2/user-pnl` (reconciliation only) | day |
-| `market_context` | stage 2 | `trade_uid` |
+| `token_prices` | CLOB `/prices-history` (~60 s points) of the Up and Down token | `market_id, outcome, t` |
+| `window_meta` | Gamma `eventMetadata` of neighbouring windows (to chain missing strikes) | `slug` |
+| `window_refs` | strike / final per traded market + Binance proxy anchored on them | `condition_id` |
+| `market_context` | per fill: window timing, strike, spot, distance, TWAP, returns, volatility, token prices, PnL if held | `trade_uid` |
+| `episodes` | per market position: shares and cost per side, pair cost, merges, redeems, PnL | `condition_id` |
 
 How the columns are derived:
 

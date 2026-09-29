@@ -30,10 +30,20 @@ class Config:
     log_level: str
     data_api: str
     gamma_api: str
+    clob_api: str
+    binance_api: str
     http: dict[str, Any] = field(default_factory=dict)
     rate_limits: dict[str, float] = field(default_factory=dict)
     sync: dict[str, Any] = field(default_factory=dict)
     fees: dict[str, Any] = field(default_factory=dict)
+    spot: dict[str, Any] = field(default_factory=dict)
+    prices: dict[str, Any] = field(default_factory=dict)
+    root: Path = field(default_factory=Path.cwd)
+
+    @property
+    def spot_cache_dir(self) -> Path:
+        p = Path(self.spot.get("cache_dir", "data/spot"))
+        return p if p.is_absolute() else self.root / p
 
     @property
     def crypto_fee_rate(self) -> float:
@@ -60,8 +70,13 @@ def load_config(path: str | os.PathLike[str] | None = None, root: Path | None = 
         log_level=os.environ.get("BOSONA_LOG_LEVEL", raw.get("log_level", "INFO")),
         data_api=api.get("data", "https://data-api.polymarket.com").rstrip("/"),
         gamma_api=api.get("gamma", "https://gamma-api.polymarket.com").rstrip("/"),
+        clob_api=api.get("clob", "https://clob.polymarket.com").rstrip("/"),
+        binance_api=api.get("binance", "https://data-api.binance.vision").rstrip("/"),
         http=raw.get("http", {}),
         rate_limits={k: float(v) for k, v in (raw.get("rate_limits") or {}).items()},
         sync=raw.get("sync", {}),
         fees=raw.get("fees", {}),
+        spot=raw.get("spot", {}),
+        prices=raw.get("prices", {}),
+        root=root,
     )

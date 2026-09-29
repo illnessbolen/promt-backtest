@@ -12,9 +12,13 @@ import time
 
 from bosona import db
 from bosona.config import Config, load_config
+from bosona.context import enrich, sync_neighbour_meta
 from bosona.http import ApiClient
+from bosona.prices import sync_token_prices
+from bosona.spot import sync_spot
 from bosona.sync_history import finalize_trades, sync_history
 from bosona.sync_markets import sync_markets
+from bosona.validate import validate
 from bosona.verify import verify
 
 log = logging.getLogger("bosona")
@@ -43,6 +47,9 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
     if args.command == "stats":
         print(json.dumps(table_counts(conn), indent=2))
         return 0
+    if args.command == "validate":
+        print(json.dumps(validate(conn), indent=2, ensure_ascii=False, default=str))
+        return 0
     async with ApiClient(cfg) as client:
         t0 = time.monotonic()
         if args.command in ("sync", "sync-history"):
@@ -53,6 +60,13 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
             log.info("markets: %s", res)
             # fee rates are per market: recompute formula fees now that market metadata is known
             finalize_trades(conn, 0, 2**62, cfg.crypto_fee_rate)
+        if args.command in ("sync-spot", "stage2"):
+            log.info("spot: %s", await sync_spot(cfg, conn, client))
+        if args.command in ("sync-prices", "stage2"):
+            log.info("token prices: %s", await sync_token_prices(cfg, conn, client))
+        if args.command in ("enrich", "stage2"):
+            log.info("neighbour windows: %s", await sync_neighbour_meta(cfg, conn, client))
+            log.info("enrich: %s", enrich(cfg, conn))
         if args.command == "verify":
             report = await verify(cfg, conn, client)
             print(json.dumps(report, indent=2, ensure_ascii=False))
@@ -61,7 +75,8 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
 
 
 def table_counts(conn) -> dict[str, int]:
-    tables = ["trades", "taker_fills", "activity", "markets", "resolutions", "market_context", "pnl_daily"]
+    tables = ["trades", "taker_fills", "activity", "markets", "resolutions", "pnl_daily",
+              "token_prices", "price_sync", "window_meta", "window_refs", "market_context", "episodes"]
     return {t: db.scalar(conn, f"SELECT COUNT(*) FROM {t}") for t in tables}
 
 
@@ -77,6 +92,11 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("sync-markets", help="sync Gamma metadata / resolutions for markets in the history")
     p.add_argument("--refresh-all", action="store_true", help="re-fetch every market, not only pending ones")
     sub.add_parser("verify", help="reconcile the local history with Data API aggregates")
+    sub.add_parser("sync-spot", help="download Binance 1s closes for every traded market window (cached per day)")
+    sub.add_parser("sync-prices", help="download CLOB price history of both tokens for every traded market")
+    sub.add_parser("enrich", help="compute window refs, per-trade market context and episodes (stage 2)")
+    sub.add_parser("stage2", help="sync-spot + sync-prices + enrich")
+    sub.add_parser("validate", help="stage 2 quality report: coverage, proxy accuracy, PnL reconciliation")
     sub.add_parser("stats", help="print row counts")
     args = parser.parse_args(argv)
 
