@@ -1,0 +1,93 @@
+"""Command line entry point: `python -m bosona <command>`."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import logging
+import logging.handlers
+import sys
+import time
+
+from bosona import db
+from bosona.config import Config, load_config
+from bosona.http import ApiClient
+from bosona.sync_history import finalize_trades, sync_history
+from bosona.sync_markets import sync_markets
+from bosona.verify import verify
+
+log = logging.getLogger("bosona")
+
+
+def setup_logging(cfg: Config) -> None:
+    cfg.log_dir.mkdir(parents=True, exist_ok=True)
+    fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    fmt.converter = time.gmtime
+    file_handler = logging.handlers.RotatingFileHandler(cfg.log_dir / "bosona.log", maxBytes=10_000_000, backupCount=5)
+    file_handler.setFormatter(fmt)
+    console = logging.StreamHandler(sys.stderr)
+    console.setFormatter(fmt)
+    root = logging.getLogger()
+    root.handlers[:] = [file_handler, console]
+    root.setLevel(cfg.log_level.upper())
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
+async def _run(args: argparse.Namespace, cfg: Config) -> int:
+    conn = db.connect(cfg.db_path)
+    db.init_schema(conn)
+    if args.command == "init-db":
+        log.info("schema ready at %s", cfg.db_path)
+        return 0
+    if args.command == "stats":
+        print(json.dumps(table_counts(conn), indent=2))
+        return 0
+    async with ApiClient(cfg) as client:
+        t0 = time.monotonic()
+        if args.command in ("sync", "sync-history"):
+            res = await sync_history(cfg, conn, client, full=args.full)
+            log.info("history: %s", res)
+        if args.command in ("sync", "sync-markets"):
+            res = await sync_markets(cfg, conn, client, refresh_all=getattr(args, "refresh_all", False))
+            log.info("markets: %s", res)
+            # fee rates are per market: recompute formula fees now that market metadata is known
+            finalize_trades(conn, 0, 2**62, cfg.crypto_fee_rate)
+        if args.command == "verify":
+            report = await verify(cfg, conn, client)
+            print(json.dumps(report, indent=2, ensure_ascii=False))
+        log.info("%s done in %.1fs, %d HTTP requests", args.command, time.monotonic() - t0, client.requests)
+    return 0
+
+
+def table_counts(conn) -> dict[str, int]:
+    tables = ["trades", "taker_fills", "activity", "markets", "resolutions", "market_context", "pnl_daily"]
+    return {t: db.scalar(conn, f"SELECT COUNT(*) FROM {t}") for t in tables}
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="bosona", description="Read-only history tracker for Polymarket @bosona")
+    parser.add_argument("--config", help="path to config.yaml (default: $BOSONA_CONFIG or ./config.yaml)")
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("init-db", help="create the SQLite schema")
+    p = sub.add_parser("sync", help="sync history + market metadata (idempotent, incremental)")
+    p.add_argument("--full", action="store_true", help="re-walk the whole history instead of the incremental window")
+    p = sub.add_parser("sync-history", help="sync fills and activity from Data API v2")
+    p.add_argument("--full", action="store_true", help="re-walk the whole history instead of the incremental window")
+    p = sub.add_parser("sync-markets", help="sync Gamma metadata / resolutions for markets in the history")
+    p.add_argument("--refresh-all", action="store_true", help="re-fetch every market, not only pending ones")
+    sub.add_parser("verify", help="reconcile the local history with Data API aggregates")
+    sub.add_parser("stats", help="print row counts")
+    args = parser.parse_args(argv)
+
+    cfg = load_config(args.config)
+    setup_logging(cfg)
+    try:
+        return asyncio.run(_run(args, cfg))
+    except KeyboardInterrupt:
+        log.warning("interrupted; the next run resumes from the last committed window")
+        return 130
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

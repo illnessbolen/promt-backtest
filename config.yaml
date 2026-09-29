@@ -1,0 +1,38 @@
+# bosona-tracker configuration. No secrets here: every source is public and read-only.
+# Any value can be overridden via environment variables or a local .env file (see .env.example).
+
+user: "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed"   # proxy wallet of @bosona
+
+db_path: data/bosona.db
+log_dir: logs
+log_level: INFO
+
+api:
+  data: https://data-api.polymarket.com
+  gamma: https://gamma-api.polymarket.com
+
+http:
+  timeout_s: 30
+  max_retries: 6
+  backoff_base_s: 1.0
+  backoff_max_s: 60
+  user_agent: "bosona-tracker/0.1 (read-only research)"
+
+# Requests per second per host. Documented limits are per 10 s windows
+# (Data API v2: 800/10 s overall, /v2/activity 200/10 s; Gamma /markets 300/10 s, /events 500/10 s),
+# we stay well below them.
+rate_limits:
+  data-api.polymarket.com: 8
+  gamma-api.polymarket.com: 12
+
+sync:
+  history_start: 1          # /v2 feeds: start=1 means "full history" (0 would floor to 3 years back)
+  overlap_s: 3600           # incremental runs re-read this much before the last synced second
+  safety_lag_s: 120         # never sync the newest seconds: the Data API ingests with a small lag
+  window_days: 7            # full-history walk is split into windows walked in parallel
+  concurrency: 4            # parallel windows
+  page_limit: 1000          # /v2 max page size
+  gamma_batch: 50           # condition ids / slugs per Gamma request
+
+fees:
+  crypto_rate: 0.07         # fee = size * rate * p * (1 - p), takers only (docs.polymarket.com/trading/fees)
