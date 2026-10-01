@@ -50,6 +50,14 @@
 
 Справка: в том же RTDS есть `crypto_prices_twap_sixty` — это TWAP 60 с, по нему резолвятся рынки. Имеет смысл писать и его; решим на этапе 3.
 
+**Статус (этап 3, 2026-10-01):** реализовано в `bosona/live/prices.py`, подробно — `docs/stage3-live.md`.
+
+- Провайдеры: `binance_ws` (всегда), `chainlink_rtds` (спот и `crypto_prices_twap_sixty`), `chainlink_data_streams` (включается сам, когда в `.env` есть ключи).
+- TWAP-60 из RTDS на старте и конце окна совпал с официальными `priceToBeat`/`finalPrice` до последнего знака (72 из 72 закрытий).
+- Для Data Streams, кроме ключей, понадобится:
+  - доступ к хостам `api.dataengine.chain.link` / `ws.dataengine.chain.link` (из контейнера сейчас 403);
+  - feed id TWAP-стримов (`btc-usd-twap-60s-streams` и т.п.) — их можно взять на data.chain.link.
+
 Ниже — исходные данные, на которых принималось решение.
 
 **Откуда известно, что публичный `crypto_prices_chainlink` в RTDS удалят** (проверено 2026-09-29):
