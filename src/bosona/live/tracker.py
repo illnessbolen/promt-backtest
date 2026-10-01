@@ -363,6 +363,8 @@ class Tracker:
         self.store.upsert("live_spot_snaps", snaps)
         self.store.upsert("live_books", list(lf.books.values()))
         self._save_fill(lf)
+        # the heavy parts are stored now; keep only the row (late channels still update it)
+        lf.detect_ticks, lf.books, lf.levels, lf.completion = {}, {}, {}, None
         log.info("fill %s final: %s %s %s role=%s first=%s lat_block=%s ms lat_match=%s ms spot %s shift=%s bps "
                  "ask %s->%s copy_slip=%s", lf.key[:18], f.get("slug"), f.get("outcome"), _fmt(f.get("price"), 4), f.get("role"),
                  f["first_channel"], _fmt(f["lat_block_ms"]), _fmt(f["lat_match_ms"]), f.get("spot_source"),
@@ -418,6 +420,9 @@ class Tracker:
             elif m:
                 tokens.update(x for x in (m.get("up_token_id"), m.get("down_token_id")) if x)
         await self.feed.set_tokens(tokens)
+        self.registry.prune(now - 2 * 86_400)
+        if len(self.closes_done) > 50_000:
+            self.closes_done = {k for k in self.closes_done if k[2] > now - 86_400}
 
     # ------------------------------------------------------------------- Binance vs Chainlink at closes
     def _record_closes(self) -> None:

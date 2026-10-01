@@ -47,6 +47,18 @@ class MarketRegistry:
         self.store.upsert("markets", rows)
         return rows
 
+    def prune(self, before_ts: float) -> None:
+        """Forget windows that ended before `before_ts` (they stay in live.db)."""
+        old = [slug for slug, row in self.by_slug.items() if (row.get("window_end_ts") or 0) < before_ts]
+        for slug in old:
+            row = self.by_slug.pop(slug)
+            for tok in (row.get("up_token_id"), row.get("down_token_id")):
+                if tok and self.by_token.get(tok) is row:
+                    del self.by_token[tok]
+        for slug, until in list(self._missing_until.items()):
+            if until < before_ts:
+                del self._missing_until[slug]
+
     def get(self, token: str) -> dict[str, Any] | None:
         return self.by_token.get(token)
 
