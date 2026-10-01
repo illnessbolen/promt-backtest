@@ -283,3 +283,56 @@ def test_chain_detector_reorg_keeps_fill_keys():
     det._handle_log({**a, "logIndex": hex(3), "blockNumber": hex(int(lg["blockNumber"], 16) + 1)}, 5.0)  # ... re-added
     assert [e.fill_key for e in got][2] == got[0].fill_key and len(got) == 3
     assert got[0].block_ts == 1_790_000_000
+
+
+# ------------------------------------------------------------------------------- windows of the tracker
+def test_registry_wanted_windows_with_lead(tmp_path):
+    from bosona.live.markets import MarketRegistry
+
+    reg = MarketRegistry(LiveStore(tmp_path / "live.db"), client=None, gamma_url="", assets=["btc"], timeframes=["5m", "1h"],
+                         lead_s=60)
+    t = 1790880000 + 200  # 100 s before the next 5m window, 1h window has 1600 s left... (1790880000 = 18:40 UTC)
+    got = reg.wanted(t)
+    assert [w[3] for w in got] == ["btc-updown-5m-1790880000", "bitcoin-up-or-down-october-1-2026-2pm-et"]
+    got = reg.wanted(1790880300 - 30)  # 30 s before the next 5m window opens: subscribe it too
+    assert "btc-updown-5m-1790880300" in [w[3] for w in got]
+
+
+def _tracker_with_store(tmp_path):
+    import types
+
+    st = LiveStore(tmp_path / "live.db")
+    t = types.SimpleNamespace(store=st, prices=PriceBook())
+    t._bn_twap = lambda asset, t_end, lookback=60: Tracker._bn_twap(t, asset, t_end, lookback)
+    return t, st
+
+
+def test_binance_twap_forward_fills_missing_seconds(tmp_path):
+    t, st = _tracker_with_store(tmp_path)
+    # seconds 940..999: price 100 until 969, then 110 from 970; seconds 980-989 have no trade (forward-filled)
+    for sec in range(930, 1000):
+        if 980 <= sec < 990:
+            continue
+        st.add_spot(PriceTick("binance", "spot", "btc", 100.0 if sec < 970 else 110.0, sec * 1000.0 + 500, 0))
+    st.flush()
+    assert Tracker._bn_twap(t, "btc", 1000) == pytest.approx((30 * 100 + 30 * 110) / 60)
+    assert Tracker._bn_twap(t, "eth", 1000) is None
+
+
+def test_close_row_winners_and_divergence(tmp_path):
+    t, st = _tracker_with_store(tmp_path)
+    ws, we = 1_000, 1_300
+    for sec in range(ws - 120, we + 1):
+        cl = 100.0 + (sec - ws) * 0.001       # Chainlink drifts up
+        st.add_spot(PriceTick("chainlink", "spot", "btc", cl, sec * 1000.0, 0))
+        st.add_spot(PriceTick("chainlink", "twap60", "btc", cl - 0.03, sec * 1000.0, 0))
+        st.add_spot(PriceTick("binance", "spot", "btc", cl * 1.0005, sec * 1000.0 + 400, 0))  # +5 bps basis
+        t.prices.update(PriceTick("binance", "spot", "btc", cl * 1.0005, sec * 1000.0 + 400, 0))
+    st.flush()
+    row = Tracker._close_row(t, "btc", "5m", ws, we)
+    assert row["slug"] == "btc-updown-5m-1000"
+    assert row["winner_cl"] == "Up" and row["winner_bn"] == "Up"
+    assert row["cl_end"] == pytest.approx(100.3 - 0.03) and row["cl_start"] == pytest.approx(100.0 - 0.03)
+    # last Binance trade at or before the close (second 1299) vs the Chainlink observation of the close (1300)
+    assert row["div_spot_bps"] == pytest.approx((100.299 * 1.0005 / 100.3 - 1) * 1e4)
+    assert row["basis_bps"] == pytest.approx(5.0, abs=0.01)

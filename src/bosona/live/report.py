@@ -118,6 +118,8 @@ def closes(conn: sqlite3.Connection, since_ts: float) -> dict[str, Any]:
     if c.empty:
         return {"closes": 0}
     c["div_twap_demeaned"] = c["div_twap_bps"] - c["basis_bps"]
+    # the stage 2 proxy replayed on live data: Binance TWAP anchored on the Chainlink value at the window start
+    c["proxy_err_bps"] = (c["bn_end"] * c["cl_start"] / c["bn_start"] / c["cl_end"] - 1) * 1e4
     both = c.dropna(subset=["winner_cl", "winner_bn"])
     official = c.dropna(subset=["official_final", "cl_end"])
     out: dict[str, Any] = {"closes": int(len(c)), "with_both_sources": int(len(both))}
@@ -130,6 +132,7 @@ def closes(conn: sqlite3.Connection, since_ts: float) -> dict[str, Any]:
             "div_twap_bps": _q(g["div_twap_bps"]),
             "div_twap_minus_basis_abs_bps": _q(g["div_twap_demeaned"].abs()),
             "abs_move_bps": _q(g["move_cl_bps"].abs()),
+            "anchored_binance_proxy_abs_err_bps": _q(g["proxy_err_bps"].abs()),
             "winner_disagree": int((b["winner_cl"] != b["winner_bn"]).sum()),
         }
     out["per_series"] = per

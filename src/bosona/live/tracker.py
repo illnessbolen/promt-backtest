@@ -294,7 +294,7 @@ class Tracker:
         results = await asyncio.gather(*(self.client.get_json(f"{self.cfg.clob_api}/book", {"token_id": tok}) for tok in tokens),
                                        return_exceptions=True)
         taken = now_ms()
-        for tok, res in zip(tokens, results):
+        for tok, res in zip(tokens, results, strict=True):
             if isinstance(res, Exception):
                 log.info("REST book %s unavailable: %s", tok[:12], res)
                 continue

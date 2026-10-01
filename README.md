@@ -86,6 +86,11 @@ How the columns are derived:
 | price `chainlink_rtds` | RTDS `crypto_prices_chainlink`, `crypto_prices_twap_sixty` | Chainlink spot and 60 s TWAP (the resolution input of 5m/15m/4h) while the legacy topics exist |
 | price `chainlink_data_streams` | Chainlink Data Streams WebSocket | off by default; switches on when `CHAINLINK_DS_API_KEY` and `CHAINLINK_DS_USER_SECRET` are set in `.env` |
 
+Running it for days: any supervisor that sends SIGTERM to stop works (the tracker finishes pending records and closes
+its sockets in ~3 s), e.g. a systemd unit with
+`ExecStart=/path/to/repo/.venv/bin/python -m bosona track`, `WorkingDirectory=/path/to/repo`, `Restart=always`.
+`live.db` grows by ~100 MB a day, mostly per-second prices.
+
 Every price provider is a `PriceProvider` subclass registered by name (`bosona/live/prices.py`); `live.price_providers`
 in `config.yaml` lists the ones to start. A provider that cannot connect is retried with backoff and the others keep going.
 Every stored price carries its `source` and `kind`.
