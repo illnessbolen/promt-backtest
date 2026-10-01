@@ -38,6 +38,7 @@ class Config:
     fees: dict[str, Any] = field(default_factory=dict)
     spot: dict[str, Any] = field(default_factory=dict)
     prices: dict[str, Any] = field(default_factory=dict)
+    live: dict[str, Any] = field(default_factory=dict)
     root: Path = field(default_factory=Path.cwd)
 
     @property
@@ -48,6 +49,11 @@ class Config:
     @property
     def crypto_fee_rate(self) -> float:
         return float(self.fees.get("crypto_rate", 0.07))
+
+    @property
+    def live_db_path(self) -> Path:
+        p = Path(os.environ.get("BOSONA_LIVE_DB_PATH") or self.live.get("db_path", "data/live.db"))
+        return p if p.is_absolute() else self.root / p
 
 
 def load_config(path: str | os.PathLike[str] | None = None, root: Path | None = None) -> Config:
@@ -78,5 +84,6 @@ def load_config(path: str | os.PathLike[str] | None = None, root: Path | None = 
         fees=raw.get("fees", {}),
         spot=raw.get("spot", {}),
         prices=raw.get("prices", {}),
+        live=raw.get("live", {}),
         root=root,
     )

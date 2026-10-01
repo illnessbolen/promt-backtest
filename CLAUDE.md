@@ -155,4 +155,6 @@ python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'   # установ
 .venv/bin/pytest                           # тесты парсинга, дедупликации и контекста
 .venv/bin/python -m bosona stage2          # этап 2: 1s-цены Binance + история цен токенов + контекст сделок
 .venv/bin/python -m bosona validate        # этап 2: покрытие, точность прокси, сверка PnL
+.venv/bin/python -m bosona track           # этап 3: live-трекер (Ctrl+C/SIGTERM — штатная остановка), data/live.db, logs/live.log
+.venv/bin/python -m bosona live-report     # этап 3: задержки по каналам, сдвиг цены, цена копирования, Binance vs Chainlink
 ```

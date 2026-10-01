@@ -15,9 +15,7 @@ sqlite3.register_adapter(np.float64, float)
 sqlite3.register_adapter(np.float32, float)
 sqlite3.register_adapter(np.bool_, bool)
 
-SCHEMA = """
-PRAGMA journal_mode = WAL;
-
+MARKETS_DDL = """
 -- One row per market (conditionId). Metadata from Gamma; re-fetched until the market is final.
 CREATE TABLE IF NOT EXISTS markets (
   condition_id        TEXT PRIMARY KEY,
@@ -51,7 +49,12 @@ CREATE TABLE IF NOT EXISTS markets (
   fetched_at          INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_markets_asset_tf_start ON markets(asset, timeframe, window_start_ts);
+"""
 
+SCHEMA = """
+PRAGMA journal_mode = WAL;
+
+""" + MARKETS_DDL + """
 CREATE TABLE IF NOT EXISTS resolutions (
   condition_id   TEXT PRIMARY KEY,
   winner         TEXT,                   -- Up|Down|50-50

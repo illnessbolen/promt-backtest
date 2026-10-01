@@ -75,7 +75,7 @@ class ApiClient:
     def _backoff(self, attempt: int) -> float:
         return min(self.backoff_max, self.backoff_base * 2**attempt) * (0.5 + random.random() / 2)
 
-    async def get_json(self, url: str, params: dict[str, Any] | None = None) -> Any:
+    async def get_json(self, url: str, params: dict[str, Any] | list[tuple[str, Any]] | None = None) -> Any:
         limiter = self._limiters.get(httpx.URL(url).host)
         last_error = ""
         for attempt in range(self.max_retries + 1):

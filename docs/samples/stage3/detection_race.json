@@ -1,0 +1,175 @@
+{
+ "_note": "Who sees @bosona's fills first. Times are local receive time minus the block timestamp (ms, block ts has 1 s resolution; Polygon heads arrive ~0.9 s before their nominal timestamp). clob_match = market-channel last_trade_price timestamp of the same tx (the CLOB match).",
+ "race1_2026-10-01T18:10Z_7min": {
+  "chain_channel": "HTTP polling eth_blockNumber/eth_getLogs every 0.4 s",
+  "fills": [
+   {
+    "tx": "0x075bce2920fa6750de6ff272d4c93d71fbf73bbb16aa9e170704bf450404840f",
+    "role": "taker",
+    "block_ts": 1790878253,
+    "clob_match_minus_block_ms": -2972,
+    "chain_minus_block_ms": -139,
+    "rtds_minus_block_ms": -270,
+    "data_api_minus_block_ms": 13836
+   },
+   {
+    "tx": "0x93c6a1f92c4307222bfb9c40a2ca1eab3569c979674a36000acc34e52fc3b2bb",
+    "role": "maker",
+    "block_ts": 1790878356,
+    "clob_match_minus_block_ms": -2412,
+    "chain_minus_block_ms": 1353,
+    "rtds_minus_block_ms": 581,
+    "data_api_minus_block_ms": 4634
+   },
+   {
+    "tx": "0x9c5147a8725584e8698cf128e6b8705a79cd81388bf813d00588c1f057ac0292",
+    "role": "taker",
+    "block_ts": 1790878367,
+    "clob_match_minus_block_ms": -3800,
+    "chain_minus_block_ms": 660,
+    "rtds_minus_block_ms": -654,
+    "data_api_minus_block_ms": 9232
+   },
+   {
+    "tx": "0x9c0009a6eca8ac019ff8d157e4efb2fe345d7e5b24497a25b339bb95297bce37",
+    "role": "maker",
+    "block_ts": 1790878370,
+    "clob_match_minus_block_ms": -2289,
+    "chain_minus_block_ms": 802,
+    "rtds_minus_block_ms": -174,
+    "data_api_minus_block_ms": 6232
+   },
+   {
+    "tx": "0x2080980df16e626d60812d3d8a2a8e3674818e6b0d948e56cb04c5c4434c3be3",
+    "role": "maker",
+    "block_ts": 1790878412,
+    "clob_match_minus_block_ms": -2056,
+    "chain_minus_block_ms": -668,
+    "rtds_minus_block_ms": -680,
+    "data_api_minus_block_ms": 11182
+   },
+   {
+    "tx": "0x2932334654ebb332737487cbd0822a671456070bfa03a4ac41ea72a4dd1e8e21",
+    "role": "maker",
+    "block_ts": 1790878412,
+    "clob_match_minus_block_ms": -2099,
+    "chain_minus_block_ms": -668,
+    "rtds_minus_block_ms": -641,
+    "data_api_minus_block_ms": 11182
+   },
+   {
+    "tx": "0x36dcaab8640726c4197df97f6bb7a7b84dce8b5f87058a6927a0cfdda70b8f11",
+    "role": "maker",
+    "block_ts": 1790878458,
+    "clob_match_minus_block_ms": -3039,
+    "chain_minus_block_ms": -377,
+    "rtds_minus_block_ms": 48,
+    "data_api_minus_block_ms": 12092
+   },
+   {
+    "tx": "0x7ead728a6fe8018150d7e0ff526c673b86b74dce4363f1d7430b99fc4d19d718",
+    "role": "maker",
+    "block_ts": 1790878515,
+    "clob_match_minus_block_ms": null,
+    "chain_minus_block_ms": -651,
+    "rtds_minus_block_ms": -98,
+    "data_api_minus_block_ms": 2078
+   },
+   {
+    "tx": "0x2ad3d6c91721388196bbaca981c2b5522d0f7fac442b86a8109cf14de4d2c1d9",
+    "role": "maker",
+    "block_ts": 1790878560,
+    "clob_match_minus_block_ms": -1504,
+    "chain_minus_block_ms": 1095,
+    "rtds_minus_block_ms": 250,
+    "data_api_minus_block_ms": 19623
+   }
+  ]
+ },
+ "race2_2026-10-01T18:20Z_10min": {
+  "chain_channel": "eth_subscribe logs (maker topic = wallet) over WSS",
+  "fills": [
+   {
+    "tx": "0xde011d647091e9944947827ab7110a5ba31a4bc2dfcd4ed94d3157525b1e44af",
+    "role": "taker",
+    "block_ts": 1790878883,
+    "clob_match_minus_block_ms": null,
+    "chain_minus_block_ms": -1295,
+    "rtds_minus_block_ms": -396,
+    "data_api_minus_block_ms": 2814
+   },
+   {
+    "tx": "0x46ffdba71e2aa25816b8c2b46cf3206fe7e53af2d93b49c0a9008edbeb33aaf1",
+    "role": "maker",
+    "block_ts": 1790879016,
+    "clob_match_minus_block_ms": null,
+    "chain_minus_block_ms": -800,
+    "rtds_minus_block_ms": 659,
+    "data_api_minus_block_ms": 10132
+   },
+   {
+    "tx": "0x5928990289a130a1096ef08aa6d853cb6a3ca795f714eab1d05e65ffd0267e15",
+    "role": "maker",
+    "block_ts": 1790879196,
+    "clob_match_minus_block_ms": -2016,
+    "chain_minus_block_ms": -820,
+    "rtds_minus_block_ms": -475,
+    "data_api_minus_block_ms": 732
+   },
+   {
+    "tx": "0xb7dd4a25be6d16bf6b2459cc6d96628c68aa4d74d8a204374243778f7ded88a0",
+    "role": "maker",
+    "block_ts": 1790879196,
+    "clob_match_minus_block_ms": -1464,
+    "chain_minus_block_ms": -817,
+    "rtds_minus_block_ms": -531,
+    "data_api_minus_block_ms": 732
+   },
+   {
+    "tx": "0x0aa64f2e632cd022d47e6e7f371f0a7c46d149589e90aad99c0e344d15eda206",
+    "role": "maker",
+    "block_ts": 1790879199,
+    "clob_match_minus_block_ms": -1941,
+    "chain_minus_block_ms": -632,
+    "rtds_minus_block_ms": 111,
+    "data_api_minus_block_ms": 13254
+   },
+   {
+    "tx": "0xff51943a0e1b956153cb0a4730f4d34d86cbc66909775fb64ed4636fc74f791f",
+    "role": "maker",
+    "block_ts": 1790879213,
+    "clob_match_minus_block_ms": -3472,
+    "chain_minus_block_ms": -1260,
+    "rtds_minus_block_ms": -119,
+    "data_api_minus_block_ms": 14780
+   },
+   {
+    "tx": "0xf40c77e9be7f0ccdc4b106fccc080ced64e2183c41c0229368e98943c2939eb7",
+    "role": "maker",
+    "block_ts": 1790879274,
+    "clob_match_minus_block_ms": -2488,
+    "chain_minus_block_ms": -742,
+    "rtds_minus_block_ms": -131,
+    "data_api_minus_block_ms": 15861
+   },
+   {
+    "tx": "0x27e0ba842f8468823cacc2e66ac2739f9d474f02cce2410e32dba7b229638368",
+    "role": "maker",
+    "block_ts": 1790879313,
+    "clob_match_minus_block_ms": -2958,
+    "chain_minus_block_ms": -658,
+    "rtds_minus_block_ms": 1336,
+    "data_api_minus_block_ms": 7860
+   },
+   {
+    "tx": "0x11cc9d2ed3254f54f40ddd93ece9102440cb63bad28cc29164097b9539183aeb",
+    "role": "maker",
+    "block_ts": 1790879342,
+    "clob_match_minus_block_ms": null,
+    "chain_minus_block_ms": -1337,
+    "rtds_minus_block_ms": -535,
+    "data_api_minus_block_ms": 9856
+   }
+  ]
+ }
+}

@@ -24,11 +24,11 @@ from bosona.verify import verify
 log = logging.getLogger("bosona")
 
 
-def setup_logging(cfg: Config) -> None:
+def setup_logging(cfg: Config, filename: str = "bosona.log") -> None:
     cfg.log_dir.mkdir(parents=True, exist_ok=True)
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
     fmt.converter = time.gmtime
-    file_handler = logging.handlers.RotatingFileHandler(cfg.log_dir / "bosona.log", maxBytes=10_000_000, backupCount=5)
+    file_handler = logging.handlers.RotatingFileHandler(cfg.log_dir / filename, maxBytes=20_000_000, backupCount=10)
     file_handler.setFormatter(fmt)
     console = logging.StreamHandler(sys.stderr)
     console.setFormatter(fmt)
@@ -36,9 +36,20 @@ def setup_logging(cfg: Config) -> None:
     root.handlers[:] = [file_handler, console]
     root.setLevel(cfg.log_level.upper())
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("websockets").setLevel(logging.WARNING)
 
 
 async def _run(args: argparse.Namespace, cfg: Config) -> int:
+    if args.command == "track":
+        from bosona.live.tracker import run_tracker
+
+        await run_tracker(cfg, duration_s=args.duration)
+        return 0
+    if args.command == "live-report":
+        from bosona.live.report import live_report
+
+        print(json.dumps(live_report(cfg, since_h=args.hours), indent=2, ensure_ascii=False, default=str))
+        return 0
     conn = db.connect(cfg.db_path)
     db.init_schema(conn)
     if args.command == "init-db":
@@ -98,10 +109,14 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("stage2", help="sync-spot + sync-prices + enrich")
     sub.add_parser("validate", help="stage 2 quality report: coverage, proxy accuracy, PnL reconciliation")
     sub.add_parser("stats", help="print row counts")
+    p = sub.add_parser("track", help="stage 3: live tracker of new fills (Ctrl+C / SIGTERM stops it cleanly)")
+    p.add_argument("--duration", type=float, default=None, help="stop after this many seconds (default: run until stopped)")
+    p = sub.add_parser("live-report", help="stage 3: detection latency, price shift and Binance vs Chainlink summary")
+    p.add_argument("--hours", type=float, default=None, help="only the last N hours (default: everything recorded)")
     args = parser.parse_args(argv)
 
     cfg = load_config(args.config)
-    setup_logging(cfg)
+    setup_logging(cfg, "live.log" if args.command == "track" else "bosona.log")
     try:
         return asyncio.run(_run(args, cfg))
     except KeyboardInterrupt:

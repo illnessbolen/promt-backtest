@@ -50,3 +50,37 @@ prices:
   concurrency: 16                 # CLOB /prices-history requests in flight
   pre_window_s: 300               # token price history fetched for [window_start - pre, window_end + post]
   post_window_s: 120
+
+# Stage 3: live tracker (`python -m bosona track`). Every source is public; nothing here is a secret.
+live:
+  db_path: data/live.db                 # separate from bosona.db: small writes every 0.5 s, never blocked by batch jobs
+  assets: [btc, eth, sol, xrp, doge, bnb]
+  detectors: [rtds_activity, chain_logs, data_api]   # all run at once; the first sighting wins, each one's latency is kept
+  data_api_poll_s: 3                    # /v2/activity: 200 req / 10 s allowed, we use 1 / 3 s
+  rtds_url: wss://ws-live-data.polymarket.com
+  rpc_ws: wss://polygon-bor-rpc.publicnode.com        # eth_subscribe logs + newHeads
+  rpc_http: https://polygon-bor-rpc.publicnode.com    # back-fill after reconnects, late block timestamps
+  clob_ws_url: wss://ws-subscriptions-clob.polymarket.com/ws/market
+  timeframes: [5m, 15m, 1h, 4h, 1d]     # open windows whose metadata is fetched ahead (token -> market without a lookup)
+  book_series: [btc:5m, btc:15m, btc:1h, eth:5m]  # ~88% of his fills; books streamed from the market channel.
+                                        # Other markets: REST /book at detection, then streamed for 15 min after a fill.
+                                        # Each BTC window is ~100 book updates/s: a too wide set gets the socket closed
+                                        # by the server (1013 slow consumer).
+  window_lead_s: 60                     # subscribe to the next window this long before it opens
+  book_depth: 10                        # levels per side kept in snapshots
+  close_timeframes: [5m, 15m, 4h]       # Chainlink-resolved windows: Binance vs Chainlink recorded at every close
+  close_delay_s: 3                      # RTDS Chainlink ticks arrive ~1.5 s after their timestamp
+  finalize_after_s: 30                  # reference values are computed once the slower channels have reported
+  price_ring_s: 1200                    # in-memory price history (per-second values are also stored in live.db)
+  stale_s: 10                           # a provider without ticks for this long is reported as down
+  price_providers: [binance_ws, chainlink_rtds, chainlink_data_streams]
+  providers:
+    binance_ws:
+      url: wss://data-stream.binance.vision        # aggTrade of <asset>usdt
+    chainlink_rtds:
+      url: wss://ws-live-data.polymarket.com       # legacy topics, removal planned ~2026-10-23; Binance keeps running
+      topics: [crypto_prices_chainlink, crypto_prices_twap_sixty]
+    chainlink_data_streams:                        # off until CHAINLINK_DS_API_KEY / CHAINLINK_DS_USER_SECRET are in .env
+      ws_url: wss://ws.dataengine.chain.link
+      feeds:                                       # "<asset>:<kind>": feed id (or CHAINLINK_DS_FEEDS in .env)
+        "btc:spot": "0x00039d9e45394f473ab1f050a1b963e6b05351e52d71e507509ada0c95ed75b8"   # BTC/USD (example in @chainlink/data-streams-sdk)

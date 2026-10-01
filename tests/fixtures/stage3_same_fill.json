@@ -1,0 +1,66 @@
+{
+ "_source": "live capture 2026-10-01 (scratch race probe): the same maker fill of @bosona as seen by RTDS activity, eth_subscribe logs and /v2/activity",
+ "expected_role": "maker",
+ "rtds": {
+  "topic": "activity",
+  "type": "trades",
+  "timestamp": 1790879016354,
+  "payload": {
+   "asset": "49616855690172368864499903766804841832169352360797277625421404209014834159993",
+   "bio": "",
+   "conditionId": "0x2f41ab253d5fe3dad43e36ce54f40beb20c9d37e95621515d06c85a8ce7c1529",
+   "eventSlug": "btc-updown-5m-1790878800",
+   "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/BTC+fullsize.png",
+   "name": "bosona",
+   "outcome": "Up",
+   "outcomeIndex": 0,
+   "price": 0.85,
+   "profileImage": "",
+   "proxyWallet": "0xc2Ad03F79CA3F3c17D8c7De2612cE0C89b7D40Ed",
+   "pseudonym": "Impolite-Sister",
+   "side": "BUY",
+   "size": 996,
+   "slug": "btc-updown-5m-1790878800",
+   "timestamp": 1790879016,
+   "title": "Bitcoin Up or Down - October 1, 2:20PM-2:25PM ET",
+   "transactionHash": "0x46ffdba71e2aa25816b8c2b46cf3206fe7e53af2d93b49c0a9008edbeb33aaf1"
+  }
+ },
+ "chain_log": {
+  "address": "0xe111180000d2663c0091e4f400237545b87b996b",
+  "topics": [
+   "0xd543adfd945773f1a62f74f0ee55a5e3b9b1a28262980ba90b1a89f2ea84d8ee",
+   "0x4b0c62e0535bea7c1d5256808ac6e948d28ff340d7325307fd99de374f725146",
+   "0x000000000000000000000000c2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+   "0x000000000000000000000000d4fc5c3d0e15d14da6c2289c43e92e03d68f42af"
+  ],
+  "data": "0x00000000000000000000000000000000000000000000000000000000000000006db22527099e8966e4586d98510b3c8cb346048e72ed207f6d201ef3614761790000000000000000000000000000000000000000000000000000000032761740000000000000000000000000000000000000000000000000000000003b5dc100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "blockNumber": "0x5a64478",
+  "logIndex": "0x1c3",
+  "transactionHash": "0x46ffdba71e2aa25816b8c2b46cf3206fe7e53af2d93b49c0a9008edbeb33aaf1",
+  "removed": false
+ },
+ "data_api_row": {
+  "proxy_wallet": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+  "timestamp": 1790879016,
+  "condition_id": "0x2f41ab253d5fe3dad43e36ce54f40beb20c9d37e95621515d06c85a8ce7c1529",
+  "type": "TRADE",
+  "size": 996.0,
+  "usdc_size": 846.6,
+  "transaction_hash": "0x46ffdba71e2aa25816b8c2b46cf3206fe7e53af2d93b49c0a9008edbeb33aaf1",
+  "price": 0.85,
+  "token_id": "49616855690172368864499903766804841832169352360797277625421404209014834159993",
+  "side": "BUY",
+  "outcome_index": 0,
+  "title": "Bitcoin Up or Down - October 1, 2:20PM-2:25PM ET",
+  "slug": "btc-updown-5m-1790878800",
+  "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/BTC+fullsize.png",
+  "event_slug": "btc-updown-5m-1790878800",
+  "outcome": "Up",
+  "name": "bosona",
+  "pseudonym": "Impolite-Sister",
+  "bio": "",
+  "profile_image": "",
+  "profile_image_optimized": ""
+ }
+}
