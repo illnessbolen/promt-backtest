@@ -228,7 +228,7 @@ def test_live_store_roundtrip(tmp_path):
 
 # ------------------------------------------------------------------------------------------- report
 def test_report_copy_pnl_and_latency(tmp_path):
-    from bosona.live.report import copy_pnl, latency
+    from bosona.live.report import copy_pnl, latency  # noqa: F401
     from bosona.live.store import FILL_COLUMNS
 
     st = LiveStore(tmp_path / "live.db")
@@ -236,12 +236,12 @@ def test_report_copy_pnl_and_latency(tmp_path):
     fills = [
         # maker buy of Up at 0.53; copier pays 0.58 at detection; Up wins
         {**base, "fill_key": "a", "tx_hash": "0xa", "condition_id": "c1", "token_id": "t1", "outcome": "Up", "side": "BUY",
-         "size": 100.0, "price": 0.53, "usdc": 53.0, "fee_usdc": 0.0, "role": "maker", "copy_vwap": 0.58,
+         "size": 100.0, "price": 0.53, "usdc": 53.0, "fee_usdc": 0.0, "role": "maker", "copy_vwap": 0.58, "copy_slip": 0.05,
          "first_channel": "chain_logs", "first_seen_ms": 10_000.0, "block_ts": 11, "match_ms": 9_000.0,
          "lat_block_ms": -1_000.0, "lat_match_ms": 1_000.0, "backfill": 0, "timeframe": "5m", "updated_ms": 1.0},
         # taker buy of Down at 0.40 (fee paid); Up wins -> both lose
         {**base, "fill_key": "b", "tx_hash": "0xb", "condition_id": "c1", "token_id": "t2", "outcome": "Down", "side": "BUY",
-         "size": 10.0, "price": 0.40, "usdc": 4.0, "fee_usdc": 0.168, "role": "taker", "copy_vwap": 0.41,
+         "size": 10.0, "price": 0.40, "usdc": 4.0, "fee_usdc": 0.168, "role": "taker", "copy_vwap": 0.41, "copy_slip": 0.01,
          "first_channel": "rtds_activity", "first_seen_ms": 20_000.0, "block_ts": 21, "match_ms": 18_000.0,
          "lat_block_ms": -1_000.0, "lat_match_ms": 2_000.0, "backfill": 0, "timeframe": "5m", "updated_ms": 1.0},
     ]
@@ -260,6 +260,14 @@ def test_report_copy_pnl_and_latency(tmp_path):
     exp_copy = 100 * 0.42 - 100 * 0.07 * 0.58 * 0.42 - 10 * 0.41 - 10 * 0.07 * 0.41 * 0.59
     assert res["all"]["copy_pnl"] == pytest.approx(exp_copy, abs=0.01)
     assert res["by_role"]["maker"]["fills"] == 1
+    # extra cost of copying per share: worse price + taker fee at the copy price - the fee he paid
+    from bosona.live.report import price_shift
+
+    ps = price_shift(st.conn, 0)
+    exp_a = (0.05 + 0.07 * 0.58 * 0.42) * 100
+    exp_b = (0.01 + 0.07 * 0.41 * 0.59 - 0.0168) * 100
+    assert ps["by_role"]["maker"]["copy_extra_cost_c_per_share_mean"] == pytest.approx(exp_a, abs=1e-3)
+    assert ps["copy_extra_cost_c_per_share"]["mean"] == pytest.approx((exp_a + exp_b) / 2, abs=1e-3)
     lat = latency(st.conn, 0)
     assert lat["won_race"] == {"chain_logs": 1, "rtds_activity": 1}
     assert lat["per_channel"]["rtds_activity"]["seen"] == 2

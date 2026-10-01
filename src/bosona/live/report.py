@@ -80,7 +80,7 @@ def latency(conn: sqlite3.Connection, since_ms: float) -> dict[str, Any]:
     return out
 
 
-def price_shift(conn: sqlite3.Connection, since_ms: float) -> dict[str, Any]:
+def price_shift(conn: sqlite3.Connection, since_ms: float, default_fee_rate: float = 0.07) -> dict[str, Any]:
     f = _read(conn, "SELECT * FROM live_fills WHERE first_seen_ms >= ? AND backfill = 0", (since_ms,))
     snaps = _read(
         conn,
@@ -105,12 +105,23 @@ def price_shift(conn: sqlite3.Connection, since_ms: float) -> dict[str, Any]:
         else round(float((f["copy_slip"].dropna() <= 1e-9).mean()), 3),
         "share_with_full_depth": round(float(f["copy_vwap"].notna().mean()), 3) if len(f) else None,
     }
+    # what copying costs per share on top of his own execution: worse price + taker fee - the fee he paid
+    rate = f["condition_id"].map(_fee_rates(conn)).fillna(default_fee_rate)
+    f["extra_c"] = (f["copy_slip"] + rate * f["copy_vwap"] * (1 - f["copy_vwap"]) - f["fee_usdc"].fillna(0) / f["size"]) * 100
+    out["copy_extra_cost_c_per_share"] = _q(f["extra_c"]) | ({"mean": round(float(f["extra_c"].mean()), 3)}
+                                                            if f["extra_c"].notna().any() else {})
     by_role = {}
     for role, g in f.groupby("role"):
         by_role[role] = {"fills": int(len(g)), "copy_vwap_slip_c": _q(g["copy_slip"] * 100),
+                         "copy_extra_cost_c_per_share": _q(g["extra_c"]),
+                         "copy_extra_cost_c_per_share_mean": None if g["extra_c"].dropna().empty else round(float(g["extra_c"].mean()), 3),
                          "spot_shift_abs_bps": _q(g["spot_shift_bps"].abs())}
     out["by_role"] = by_role
     return out
+
+
+def _fee_rates(conn: sqlite3.Connection) -> dict[str, float]:
+    return {r[0]: r[1] for r in conn.execute("SELECT condition_id, fee_rate FROM markets WHERE fee_rate IS NOT NULL")}
 
 
 def closes(conn: sqlite3.Connection, since_ts: float) -> dict[str, Any]:
@@ -208,7 +219,7 @@ async def live_report(cfg: Config, since_h: float | None = None, resolve: bool =
     out = {
         "db": str(cfg.live_db_path),
         "latency": latency(conn, since_ts * 1000),
-        "price_shift": price_shift(conn, since_ts * 1000),
+        "price_shift": price_shift(conn, since_ts * 1000, cfg.crypto_fee_rate),
         "copy_pnl": copy_pnl(conn, since_ts * 1000, cfg.crypto_fee_rate),
         "window_closes": closes(conn, since_ts),
         "spot_coverage": coverage(conn, since_ts),
