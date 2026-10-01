@@ -83,9 +83,9 @@ class MarketRegistry:
         for i in range(0, len(missing), 50):
             chunk = missing[i : i + 50]
             try:
-                # Gamma returns 20 rows unless told otherwise
+                # Gamma returns 20 rows unless told otherwise (and caches answers on its CDN for up to 5 min)
                 found = await self.client.get_json(f"{self.gamma_url}/markets",
-                                                   [("slug", s) for s in chunk] + [("limit", len(chunk))])
+                                                   [("slug", s) for s in chunk] + [("limit", 50)])
             except Exception as exc:  # noqa: BLE001 - retried on the next refresh
                 log.warning("markets: Gamma lookup failed: %s", exc)
                 continue

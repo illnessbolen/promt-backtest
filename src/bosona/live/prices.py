@@ -71,6 +71,8 @@ class PriceProvider(abc.ABC):
     def _emit(self, emit: Emit, tick: PriceTick) -> None:
         self.ticks += 1
         self.last_tick_ms = tick.recv_ms
+        if self.ws is not None:
+            self.ws.mark_data()
         emit(tick)
 
     def status(self) -> dict[str, Any]:
@@ -176,7 +178,9 @@ class ChainlinkRtds(PriceProvider):
             if tick:
                 self._emit(emit, tick)
 
-        self.ws = WsClient("chainlink_rtds", url, heartbeat_s=5, idle_timeout_s=float(self.settings.get("idle_timeout_s", 30)))
+        # a removed topic may leave a socket that only answers PING: recycle it after a minute without ticks
+        self.ws = WsClient("chainlink_rtds", url, heartbeat_s=5, idle_timeout_s=float(self.settings.get("idle_timeout_s", 30)),
+                           data_timeout_s=float(self.settings.get("data_timeout_s", 60)))
         await self.ws.run(on_open, on_message)
 
 

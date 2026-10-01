@@ -69,6 +69,8 @@ class WsClient:
         headers: Callable[[], dict[str, str]] | None = None,
         max_size: int = 2**24,
         max_queue: int = 4096,
+        data_timeout_s: float | None = None,
+        backoff_base_s: float = 1.0,
     ) -> None:
         self.name = name
         self._url = url
@@ -78,9 +80,15 @@ class WsClient:
         self._headers = headers
         self.max_size = max_size
         self.max_queue = max_queue  # frames buffered while the handler is busy (a full buffer makes the CLOB close 1013)
+        # owner-defined "useful data" (mark_data): a socket that only answers heartbeats for this long is recycled
+        self.data_timeout_s = data_timeout_s
+        self.last_data_ms = 0.0
+        self.data_marks = 0
+        self.backoff_base_s = backoff_base_s
         self.ws: ClientConnection | None = None
         self.connected = False
         self.connects = 0
+        self.failures = 0           # consecutive sessions that ended without a single message
         self.messages = 0
         self.last_msg_ms = 0.0
         self.last_error = ""
@@ -106,12 +114,14 @@ class WsClient:
         on_open: Callable[[WsClient], Awaitable[None]],
         on_message: Callable[[str, float], None],
     ) -> None:
-        backoff = Backoff()
+        backoff = Backoff(self.backoff_base_s)
         while True:
+            seen_before = self.messages, self.data_marks
             try:
+                url = self.url
                 async with connect(
-                    self.url,
-                    ssl=ssl_context(),
+                    url,
+                    ssl=ssl_context() if url.startswith("wss://") else None,
                     additional_headers=self._headers() if self._headers else None,
                     open_timeout=20,
                     ping_interval=20,
@@ -122,7 +132,9 @@ class WsClient:
                 ) as ws:
                     self.ws, self.connected = ws, True
                     self.connects += 1
-                    log.info("%s: connected (#%d)", self.name, self.connects)
+                    self.last_data_ms = now_ms()
+                    if self.failures < 3:
+                        log.info("%s: connected (#%d)", self.name, self.connects)
                     await on_open(self)
                     beat = asyncio.create_task(self._heartbeat(ws)) if self.heartbeat_s else None
                     try:
@@ -136,15 +148,25 @@ class WsClient:
                 self.last_error = f"{type(exc).__name__}: {exc}"
             finally:
                 self.ws, self.connected = None, False
+            # a session counts as failed when it brought nothing: no frame at all, or (for owners that mark data)
+            # only keep-alives
+            no_data = self.data_marks == seen_before[1] if self.data_timeout_s else self.messages == seen_before[0]
+            self.failures = self.failures + 1 if no_data else 0
             delay = backoff.next()
-            log.warning("%s: disconnected (%s), reconnect in %.1fs", self.name, self.last_error or "closed", delay)
+            # a feed that keeps failing (e.g. a removed topic) is reported now and then, not every minute
+            lvl = logging.WARNING if self.failures <= 3 or self.failures % 20 == 0 else logging.DEBUG
+            log.log(lvl, "%s: disconnected (%s), reconnect in %.1fs%s", self.name, self.last_error or "closed", delay,
+                    f" ({self.failures} sessions in a row without data)" if self.failures > 1 else "")
             await asyncio.sleep(delay)
 
     async def _read(self, ws: ClientConnection, on_message: Callable[[str, float], None], backoff: Backoff) -> None:
         while True:
+            # asyncio.timeout, not wait_for: on Python 3.11 wait_for can swallow a cancellation when the inner
+            # recv() completes at the same moment, which on a busy feed made shutdown hang
             try:
-                raw = await asyncio.wait_for(ws.recv(), timeout=self.idle_timeout_s)
-            except asyncio.TimeoutError:
+                async with asyncio.timeout(self.idle_timeout_s):
+                    raw = await ws.recv()
+            except TimeoutError:
                 raise ConnectionError(f"no message for {self.idle_timeout_s:.0f}s") from None
             recv = now_ms()
             self.messages += 1
@@ -157,6 +179,12 @@ class WsClient:
                 on_message(raw, recv)
             except Exception:  # noqa: BLE001 - a bad frame must not kill the feed
                 log.exception("%s: handler failed on %r", self.name, raw[:300])
+            if self.data_timeout_s and recv - self.last_data_ms > self.data_timeout_s * 1000:
+                raise ConnectionError(f"connected but no data for {self.data_timeout_s:g}s")
+
+    def mark_data(self) -> None:
+        self.last_data_ms = now_ms()
+        self.data_marks += 1
 
     async def _heartbeat(self, ws: ClientConnection) -> None:
         while True:

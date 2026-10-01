@@ -4,18 +4,40 @@
   * spot shift and his token's top-of-book shift between the trade and our detection;
   * cost of copying at detection (best price / VWAP of his size vs his price);
   * Binance vs Chainlink at window closes and whether the two would pick different winners;
+  * PnL of his live fills vs copying each of them at detection (taker at the detection book, taker fee);
   * coverage of the feeds.
 """
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 import time
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from bosona.config import Config
+from bosona.http import ApiClient
+from bosona.live.outcomes import resolve_pending
+from bosona.live.store import LiveStore
+
+log = logging.getLogger(__name__)
+
+
+TEXT_COLUMNS = {"fill_key", "tx_hash", "condition_id", "slug", "asset", "timeframe", "token_id", "outcome", "side", "role",
+                "order_hash", "first_channel", "channels", "ref_kind", "spot_source", "channel", "source", "kind", "winner",
+                "winner_cl", "winner_bn", "official_winner"}
+
+
+def _read(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> pd.DataFrame:
+    """read_sql with numeric columns forced to float (an all-NULL column would otherwise be 'object')."""
+    df = pd.read_sql(sql, conn, params=params)
+    for col in df.columns:
+        if col not in TEXT_COLUMNS:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
 
 
 def _q(s: pd.Series, qs: tuple[float, ...] = (0.1, 0.5, 0.9)) -> dict[str, float] | None:
@@ -26,10 +48,11 @@ def _q(s: pd.Series, qs: tuple[float, ...] = (0.1, 0.5, 0.9)) -> dict[str, float
 
 
 def latency(conn: sqlite3.Connection, since_ms: float) -> dict[str, Any]:
-    fills = pd.read_sql("SELECT * FROM live_fills WHERE first_seen_ms >= ?", conn, params=(since_ms,))
-    det = pd.read_sql(
+    fills = _read(conn, "SELECT * FROM live_fills WHERE first_seen_ms >= ?", (since_ms,))
+    det = _read(
+        conn,
         "SELECT d.fill_key, d.channel, d.recv_ms, f.block_ts, f.match_ms, f.backfill FROM live_detections d "
-        "JOIN live_fills f USING (fill_key) WHERE f.first_seen_ms >= ?", conn, params=(since_ms,))
+        "JOIN live_fills f USING (fill_key) WHERE f.first_seen_ms >= ?", (since_ms,))
     live = fills[fills["backfill"] == 0]
     out: dict[str, Any] = {
         "fills": int(len(fills)),
@@ -58,10 +81,10 @@ def latency(conn: sqlite3.Connection, since_ms: float) -> dict[str, Any]:
 
 
 def price_shift(conn: sqlite3.Connection, since_ms: float) -> dict[str, Any]:
-    f = pd.read_sql("SELECT * FROM live_fills WHERE first_seen_ms >= ? AND backfill = 0", conn, params=(since_ms,))
-    snaps = pd.read_sql(
-        "SELECT s.* FROM live_spot_snaps s JOIN live_fills f USING (fill_key) WHERE f.first_seen_ms >= ? AND f.backfill = 0",
-        conn, params=(since_ms,))
+    f = _read(conn, "SELECT * FROM live_fills WHERE first_seen_ms >= ? AND backfill = 0", (since_ms,))
+    snaps = _read(
+        conn,
+        "SELECT s.* FROM live_spot_snaps s JOIN live_fills f USING (fill_key) WHERE f.first_seen_ms >= ? AND f.backfill = 0", (since_ms,))
     out: dict[str, Any] = {"headline_spot_source": f["spot_source"].value_counts(dropna=False).to_dict(),
                            "spot_shift_bps": _q(f["spot_shift_bps"]),
                            "abs_spot_shift_bps": _q(f["spot_shift_bps"].abs())}
@@ -91,7 +114,7 @@ def price_shift(conn: sqlite3.Connection, since_ms: float) -> dict[str, Any]:
 
 
 def closes(conn: sqlite3.Connection, since_ts: float) -> dict[str, Any]:
-    c = pd.read_sql("SELECT * FROM live_window_close WHERE window_end_ts >= ?", conn, params=(since_ts,))
+    c = _read(conn, "SELECT * FROM live_window_close WHERE window_end_ts >= ?", (since_ts,))
     if c.empty:
         return {"closes": 0}
     c["div_twap_demeaned"] = c["div_twap_bps"] - c["basis_bps"]
@@ -120,6 +143,39 @@ def closes(conn: sqlite3.Connection, since_ts: float) -> dict[str, Any]:
     return out
 
 
+def copy_pnl(conn: sqlite3.Connection, since_ms: float, default_fee_rate: float = 0.07) -> dict[str, Any]:
+    """Resolved live fills: his PnL vs a copier who buys the same size at detection from the book then
+    (VWAP over the asks, taker fee size * rate * p * (1 - p)). Fills without enough depth are left out."""
+    f = _read(
+        conn,
+        "SELECT f.*, r.winner, m.fee_rate FROM live_fills f JOIN resolutions r USING (condition_id) "
+        "LEFT JOIN markets m USING (condition_id) WHERE f.first_seen_ms >= ? AND f.backfill = 0 AND f.side = 'BUY'", (since_ms,))
+    if f.empty:
+        return {"resolved_fills": 0}
+    rate = f["fee_rate"].fillna(default_fee_rate)
+    payout = np.where(f["winner"] == f["outcome"], 1.0, np.where(f["winner"] == "50-50", 0.5, 0.0))
+    his_cost = f["usdc"] + f["fee_usdc"].fillna(0)
+    f["his_pnl"] = f["size"] * payout - his_cost
+    copy_fee = f["size"] * rate * f["copy_vwap"] * (1 - f["copy_vwap"])
+    f["copy_cost"] = f["size"] * f["copy_vwap"] + copy_fee
+    f["copy_pnl"] = f["size"] * payout - f["copy_cost"]
+    c = f.dropna(subset=["copy_vwap"])
+
+    def agg(g: pd.DataFrame) -> dict[str, Any]:
+        gc = g.dropna(subset=["copy_vwap"])
+        his_c = (gc["usdc"] + gc["fee_usdc"].fillna(0)).sum()
+        return {"fills": int(len(g)), "copyable": int(len(gc)),
+                "his_pnl": round(float(gc["his_pnl"].sum()), 2), "his_pnl_per_usdc": round(float(gc["his_pnl"].sum() / his_c), 4) if his_c else None,
+                "copy_pnl": round(float(gc["copy_pnl"].sum()), 2),
+                "copy_pnl_per_usdc": round(float(gc["copy_pnl"].sum() / gc["copy_cost"].sum()), 4) if len(gc) else None,
+                "avg_extra_cost_c_per_share": round(float(((gc["copy_cost"] - gc["usdc"] - gc["fee_usdc"].fillna(0)) / gc["size"]).mean() * 100), 2) if len(gc) else None}
+
+    out = {"resolved_fills": int(len(f)), "copyable_fills": int(len(c)), "all": agg(f)}
+    out["by_role"] = {k: agg(g) for k, g in f.groupby("role")}
+    out["by_timeframe"] = {k: agg(g) for k, g in f.groupby("timeframe")}
+    return out
+
+
 def coverage(conn: sqlite3.Connection, since_ts: float) -> dict[str, Any]:
     rows = conn.execute(
         "SELECT source, kind, asset, COUNT(*), MIN(t), MAX(t) FROM live_spot WHERE t >= ? GROUP BY 1, 2, 3", (since_ts,)).fetchall()
@@ -132,13 +188,27 @@ def coverage(conn: sqlite3.Connection, since_ts: float) -> dict[str, Any]:
     return out
 
 
-def live_report(cfg: Config, since_h: float | None = None) -> dict[str, Any]:
-    conn = sqlite3.connect(cfg.live_db_path)
+async def _resolve(cfg: Config, conn: sqlite3.Connection) -> int:
+    async with ApiClient(cfg) as client:
+        return await resolve_pending(client, cfg.gamma_api, conn)
+
+
+async def live_report(cfg: Config, since_h: float | None = None, resolve: bool = True) -> dict[str, Any]:
+    store = LiveStore(cfg.live_db_path)  # creates tables a tracker of an older version did not have
+    conn = store.conn
+    if resolve:
+        try:
+            await _resolve(cfg, conn)
+        except Exception as exc:  # noqa: BLE001 - the report still works offline
+            log.warning("could not fetch resolutions: %s", exc)
     since_ts = time.time() - since_h * 3600 if since_h else 0
-    return {
+    out = {
         "db": str(cfg.live_db_path),
         "latency": latency(conn, since_ts * 1000),
         "price_shift": price_shift(conn, since_ts * 1000),
+        "copy_pnl": copy_pnl(conn, since_ts * 1000, cfg.crypto_fee_rate),
         "window_closes": closes(conn, since_ts),
         "spot_coverage": coverage(conn, since_ts),
     }
+    conn.close()
+    return out

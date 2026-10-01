@@ -48,7 +48,7 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
     if args.command == "live-report":
         from bosona.live.report import live_report
 
-        print(json.dumps(live_report(cfg, since_h=args.hours), indent=2, ensure_ascii=False, default=str))
+        print(json.dumps(await live_report(cfg, since_h=args.hours), indent=2, ensure_ascii=False, default=str))
         return 0
     conn = db.connect(cfg.db_path)
     db.init_schema(conn)

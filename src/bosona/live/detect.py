@@ -112,7 +112,7 @@ class RtdsActivityDetector:
 
     def __init__(self, user: str, url: str = "wss://ws-live-data.polymarket.com") -> None:
         self.user = user.lower()
-        self.ws = WsClient(self.name, url, heartbeat_s=5, idle_timeout_s=30)
+        self.ws = WsClient(self.name, url, heartbeat_s=5, idle_timeout_s=30, data_timeout_s=60)
         self.occ = Occurrences()
         self.messages = 0
         self.fills = 0
@@ -125,7 +125,10 @@ class RtdsActivityDetector:
             if not raw or raw[0] != "{":
                 return
             self.messages += 1
-            ev = parse_rtds_trade(json.loads(raw), self.user, recv)
+            msg = json.loads(raw)
+            if msg.get("topic") == "activity":
+                self.ws.mark_data()  # the firehose carries ~40 trades/s: a minute of silence means a dead subscription
+            ev = parse_rtds_trade(msg, self.user, recv)
             if ev:
                 ev.seq = self.occ.next(ev.base_key)
                 self.fills += 1

@@ -13,13 +13,13 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from bosona.db import MARKETS_DDL
+from bosona.db import MARKETS_DDL, RESOLUTIONS_DDL
 
 log = logging.getLogger(__name__)
 
 LIVE_SCHEMA = """
 PRAGMA journal_mode = WAL;
-""" + MARKETS_DDL + """
+""" + MARKETS_DDL + RESOLUTIONS_DDL + """
 -- One row per fill of the wallet seen live. fill_key = '{tx}:{token_id}:{side}:{size_raw}:{seq}'
 -- (the same fill reported by several channels collapses into one row).
 CREATE TABLE IF NOT EXISTS live_fills (

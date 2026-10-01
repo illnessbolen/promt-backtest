@@ -27,6 +27,7 @@ from bosona.http import ApiClient
 from bosona.live.books import BookFeed, copy_cost, parse_rest_book, summarize
 from bosona.live.detect import ChainLogsDetector, DataApiDetector, FillEvent, RtdsActivityDetector
 from bosona.live.markets import MarketRegistry
+from bosona.live.outcomes import resolve_pending
 from bosona.live.prices import PriceBook, PriceTick, build_providers
 from bosona.live.store import FILL_COLUMNS, LiveStore
 from bosona.live.wsconn import now_ms, spawn
@@ -156,18 +157,18 @@ class Tracker:
             ("clob_market", self.feed.run()), ("windows", self._every(5, self._refresh_windows)),
             ("flush", self._every(0.5, self._flush)), ("finalize", self._every(1, self._finalize_due)),
             ("closes", self._every(1, self._record_closes)), ("resolve", self._every(60, self._resolve_closes, 60)),
-            ("health", self._every(60, self._health, 60)))]
+            ("outcomes", self._every(60, self._resolve_fills, 90)), ("health", self._every(60, self._health, 60)))]
         try:
-            if duration_s:
-                await asyncio.wait_for(self.stop.wait(), timeout=duration_s)
-            else:
+            async with asyncio.timeout(duration_s):
                 await self.stop.wait()
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
         log.info("live tracker: stopping")
         for t in tasks:
             t.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        _, stuck = await asyncio.wait(tasks, timeout=15)
+        if stuck:
+            log.warning("live tracker: %d task(s) did not stop within 15 s; closing anyway", len(stuck))
         for lf in list(self.pending.values()):
             await self._finalize(lf)
         self.prices.flush_seconds()
@@ -204,7 +205,8 @@ class Tracker:
         if name == "clob_market":
             return self.feed.run()
         loops = {"windows": (5, self._refresh_windows), "flush": (0.5, self._flush), "finalize": (1, self._finalize_due),
-                 "closes": (1, self._record_closes), "resolve": (60, self._resolve_closes, 60), "health": (60, self._health, 60)}
+                 "closes": (1, self._record_closes), "resolve": (60, self._resolve_closes, 60),
+                 "outcomes": (60, self._resolve_fills, 90), "health": (60, self._health, 60)}
         if name in loops:
             return self._every(*loops[name])
         return None
@@ -480,35 +482,54 @@ class Tracker:
         }
 
     async def _resolve_closes(self) -> None:
-        """Official strike / final / winner from Gamma for recorded closes (resolution takes a minute or two)."""
+        """Official strike / final / winner from Gamma for the recorded closes.
+
+        Right after resolution Gamma shows the winner and `priceToBeat` but not yet `finalPrice`; the final of a
+        window is the strike of the next one (priceToBeat(N) = finalPrice(N-1), stage 0), so it is taken from
+        there once the next window has closed too. Gamma answers are CDN-cached for up to 5 min, hence the retries.
+        """
         now = time.time()
         rows = self.store.conn.execute(
             "SELECT asset, timeframe, window_end_ts, slug FROM live_window_close "
-            "WHERE resolved_ms IS NULL AND window_end_ts BETWEEN ? AND ? LIMIT 200", (now - 6 * 3600, now - 90)).fetchall()
+            "WHERE (official_final IS NULL OR official_winner IS NULL) AND window_end_ts BETWEEN ? AND ? "
+            "ORDER BY window_end_ts LIMIT 100", (now - 8 * 3600, now - 90)).fetchall()
         if not rows:
             return
-        slugs = {r["slug"]: r for r in rows}
-        names = list(slugs)
+        nxt = {r["slug"]: slug_for(r["asset"], r["timeframe"], r["window_end_ts"]) for r in rows}
+        names = sorted(set(nxt) | set(nxt.values()))
+        meta: dict[str, dict[str, Any]] = {}
         for i in range(0, len(names), 50):
+            chunk = names[i : i + 50]
             try:
-                chunk = names[i : i + 50]
                 found = await self.client.get_json(f"{self.cfg.gamma_api}/markets",
-                                                   [("slug", s) for s in chunk] + [("closed", "true"), ("limit", len(chunk))])
+                                                   [("slug", s) for s in chunk] + [("closed", "true"), ("limit", 50)])
             except Exception as exc:  # noqa: BLE001
                 log.warning("close resolution lookup failed: %s", exc)
                 return
             for mk in found:
-                r = slugs.get(mk.get("slug"))
-                ev = (mk.get("events") or [{}])[0]
-                _, res = parse.parse_market(mk, ev, int(now))
-                if r is None or not res or res.get("winner") is None:
-                    continue
-                self.store.conn.execute(
-                    "UPDATE live_window_close SET official_strike = ?, official_final = ?, official_winner = ?, "
-                    "resolved_ms = ? WHERE asset = ? AND timeframe = ? AND window_end_ts = ?",
-                    (res.get("price_to_beat"), res.get("final_price"), res.get("winner"), now_ms(),
-                     r["asset"], r["timeframe"], r["window_end_ts"]))
-            self.store.conn.commit()
+                _, res = parse.parse_market(mk, (mk.get("events") or [{}])[0], int(now))
+                if res:
+                    meta[mk["slug"]] = res
+        for r in rows:
+            cur, after = meta.get(r["slug"]) or {}, meta.get(nxt[r["slug"]]) or {}
+            final = cur.get("final_price") if cur.get("final_price") is not None else after.get("price_to_beat")
+            winner = cur.get("winner")
+            if cur.get("price_to_beat") is None and final is None and winner is None:
+                continue
+            self.store.conn.execute(
+                "UPDATE live_window_close SET official_strike = COALESCE(?, official_strike), "
+                "official_final = COALESCE(?, official_final), official_winner = COALESCE(?, official_winner), "
+                "resolved_ms = CASE WHEN ? IS NOT NULL AND ? IS NOT NULL THEN ? ELSE resolved_ms END "
+                "WHERE asset = ? AND timeframe = ? AND window_end_ts = ?",
+                (cur.get("price_to_beat"), final, winner, final, winner, now_ms(), r["asset"], r["timeframe"], r["window_end_ts"]))
+        self.store.conn.commit()
+
+    async def _resolve_fills(self) -> None:
+        """Winner of every market traded live (for the PnL of his fills and of copying them)."""
+        self.store.flush()
+        n = await resolve_pending(self.client, self.cfg.gamma_api, self.store.conn)
+        if n:
+            log.debug("resolved %d traded market(s)", n)
 
     # ------------------------------------------------------------------------------------------ health
     def _health_snapshot(self) -> dict[str, Any]:

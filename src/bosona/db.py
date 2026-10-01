@@ -51,10 +51,7 @@ CREATE TABLE IF NOT EXISTS markets (
 CREATE INDEX IF NOT EXISTS ix_markets_asset_tf_start ON markets(asset, timeframe, window_start_ts);
 """
 
-SCHEMA = """
-PRAGMA journal_mode = WAL;
-
-""" + MARKETS_DDL + """
+RESOLUTIONS_DDL = """
 CREATE TABLE IF NOT EXISTS resolutions (
   condition_id   TEXT PRIMARY KEY,
   winner         TEXT,                   -- Up|Down|50-50
@@ -67,7 +64,12 @@ CREATE TABLE IF NOT EXISTS resolutions (
   uma_status     TEXT,
   fetched_at     INTEGER NOT NULL
 );
+"""
 
+SCHEMA = """
+PRAGMA journal_mode = WAL;
+
+""" + MARKETS_DDL + RESOLUTIONS_DDL + """
 -- One row per fill of the tracked wallet (Data API v2 /v2/activity type=TRADE).
 -- trade_uid = '{tx}:{token_id}:{side}:{size_raw}:{price_raw}:{seq}', seq = index among identical rows of one tx
 -- (two identical maker fills in one tx are real, separate fills - verified on-chain).

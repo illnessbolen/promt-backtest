@@ -224,3 +224,44 @@ def test_live_store_roundtrip(tmp_path):
     assert st.spot_series("chainlink", "spot", "btc", 100, 103) == [(100, 100.0), (101, 101.0), (103, 103.0)]
     assert st.conn.execute("SELECT recv_ms FROM live_detections").fetchone()[0] == 1.0
     st.close()
+
+
+# ------------------------------------------------------------------------------------------- report
+def test_report_copy_pnl_and_latency(tmp_path):
+    from bosona.live.report import copy_pnl, latency
+    from bosona.live.store import FILL_COLUMNS
+
+    st = LiveStore(tmp_path / "live.db")
+    base = {c: None for c in FILL_COLUMNS}
+    fills = [
+        # maker buy of Up at 0.53; copier pays 0.58 at detection; Up wins
+        {**base, "fill_key": "a", "tx_hash": "0xa", "condition_id": "c1", "token_id": "t1", "outcome": "Up", "side": "BUY",
+         "size": 100.0, "price": 0.53, "usdc": 53.0, "fee_usdc": 0.0, "role": "maker", "copy_vwap": 0.58,
+         "first_channel": "chain_logs", "first_seen_ms": 10_000.0, "block_ts": 11, "match_ms": 9_000.0,
+         "lat_block_ms": -1_000.0, "lat_match_ms": 1_000.0, "backfill": 0, "timeframe": "5m", "updated_ms": 1.0},
+        # taker buy of Down at 0.40 (fee paid); Up wins -> both lose
+        {**base, "fill_key": "b", "tx_hash": "0xb", "condition_id": "c1", "token_id": "t2", "outcome": "Down", "side": "BUY",
+         "size": 10.0, "price": 0.40, "usdc": 4.0, "fee_usdc": 0.168, "role": "taker", "copy_vwap": 0.41,
+         "first_channel": "rtds_activity", "first_seen_ms": 20_000.0, "block_ts": 21, "match_ms": 18_000.0,
+         "lat_block_ms": -1_000.0, "lat_match_ms": 2_000.0, "backfill": 0, "timeframe": "5m", "updated_ms": 1.0},
+    ]
+    st.upsert("live_fills", fills)
+    st.upsert("live_detections", [
+        {"fill_key": "a", "channel": "chain_logs", "recv_ms": 10_000.0, "src_ts_ms": None, "raw_json": "{}"},
+        {"fill_key": "a", "channel": "rtds_activity", "recv_ms": 10_800.0, "src_ts_ms": None, "raw_json": "{}"},
+        {"fill_key": "b", "channel": "rtds_activity", "recv_ms": 20_000.0, "src_ts_ms": None, "raw_json": "{}"}])
+    st.upsert("resolutions", [{"condition_id": "c1", "winner": "Up", "payout_up": 1.0, "payout_down": 0.0, "price_to_beat": None,
+                               "final_price": None, "strike_source": None, "closed_ts": None, "uma_status": None, "fetched_at": 1}])
+    st.flush()
+    res = copy_pnl(st.conn, 0)
+    assert res["resolved_fills"] == 2 and res["copyable_fills"] == 2
+    # his: 100*1 - 53 + (0 - 4 - 0.168) = 42.832 ; copier: 100*(1 - 0.58) - fee 100*.07*.58*.42 + (0 - 10*.41 - 10*.07*.41*.59)
+    assert res["all"]["his_pnl"] == pytest.approx(42.83, abs=0.01)
+    exp_copy = 100 * 0.42 - 100 * 0.07 * 0.58 * 0.42 - 10 * 0.41 - 10 * 0.07 * 0.41 * 0.59
+    assert res["all"]["copy_pnl"] == pytest.approx(exp_copy, abs=0.01)
+    assert res["by_role"]["maker"]["fills"] == 1
+    lat = latency(st.conn, 0)
+    assert lat["won_race"] == {"chain_logs": 1, "rtds_activity": 1}
+    assert lat["per_channel"]["rtds_activity"]["seen"] == 2
+    assert lat["first_seen_minus_match_ms"]["p50"] == pytest.approx(1_500.0)
+    st.close()
