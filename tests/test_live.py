@@ -265,3 +265,21 @@ def test_report_copy_pnl_and_latency(tmp_path):
     assert lat["per_channel"]["rtds_activity"]["seen"] == 2
     assert lat["first_seen_minus_match_ms"]["p50"] == pytest.approx(1_500.0)
     st.close()
+
+
+def test_chain_detector_reorg_keeps_fill_keys():
+    from bosona.live.detect import ChainLogsDetector
+
+    det = ChainLogsDetector(BOS, "wss://x", "https://x")
+    got = []
+    det._emit = got.append
+    lg = {**_chain_log(), "blockTimestamp": hex(1_790_000_000)}
+    a, b = {**lg, "logIndex": hex(5)}, {**lg, "logIndex": hex(7)}
+    det._handle_log(a, 1.0)
+    det._handle_log(b, 2.0)
+    det._handle_log(a, 3.0)                       # duplicate notification: ignored
+    assert [e.seq for e in got] == [0, 1]
+    det._handle_log({**a, "removed": True}, 4.0)  # reorg drops the first log ...
+    det._handle_log({**a, "logIndex": hex(3), "blockNumber": hex(int(lg["blockNumber"], 16) + 1)}, 5.0)  # ... re-added
+    assert [e.fill_key for e in got][2] == got[0].fill_key and len(got) == 3
+    assert got[0].block_ts == 1_790_000_000

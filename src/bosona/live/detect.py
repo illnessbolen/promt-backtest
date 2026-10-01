@@ -178,7 +178,9 @@ class ChainLogsDetector:
         self.topic_user = "0x" + "0" * 24 + self.user[2:]
         self.block_ts: OrderedDict[int, int] = OrderedDict()
         self.seen_logs: OrderedDict[tuple[str, int], None] = OrderedDict()
-        self.occ = Occurrences()
+        # log indexes per (tx, token, side, size): seq = rank of the log index, so a fill re-added by a reorg
+        # (removed=true, then again in another block) gets its old seq back and merges instead of duplicating
+        self.same_fill_logs: OrderedDict[str, list[int]] = OrderedDict()
         self.last_block = 0
         self.fills = 0
         self.heads = 0
@@ -240,16 +242,24 @@ class ChainLogsDetector:
 
     def _handle_log(self, lg: dict[str, Any], recv: float, backfill: bool = False) -> None:
         ident = (lg["transactionHash"].lower(), int(lg["logIndex"], 16))
+        ev = parse_order_filled(lg, recv)
         if lg.get("removed"):
             log.warning("chain_logs: log removed by a reorg: %s", ident)
+            self.seen_logs.pop(ident, None)
+            if ident[1] in self.same_fill_logs.get(ev.base_key, []):
+                self.same_fill_logs[ev.base_key].remove(ident[1])
             return
         if ident in self.seen_logs:
             return
         self.seen_logs[ident] = None
         while len(self.seen_logs) > 50_000:
             self.seen_logs.popitem(last=False)
-        ev = parse_order_filled(lg, recv)
-        ev.seq = self.occ.next(ev.base_key)
+        idx = self.same_fill_logs.setdefault(ev.base_key, [])
+        idx.append(ident[1])
+        idx.sort()
+        ev.seq = idx.index(ident[1])
+        while len(self.same_fill_logs) > 50_000:
+            self.same_fill_logs.popitem(last=False)
         if ev.block_ts is None:
             ev.block_ts = self.block_ts.get(ev.block_number)
             ev.src_ts_ms = ev.block_ts * 1000.0 if ev.block_ts else None
