@@ -57,6 +57,46 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
         (cfg.root / "docs" / "stage4-data.md").write_text(render(res), encoding="utf-8")
         log.info("stage 4: docs/stage4-data.md, docs/stage4/segments.csv (%d segments)", len(res["segments"]))
         return 0
+    if args.command == "backtest":
+        from dataclasses import asdict
+
+        from bosona.backtest.engine import ExecParams
+        from bosona.backtest.report import render as render_bt
+        from bosona.backtest.run import QUEUE_MODES, run_backtest
+
+        ep = ExecParams(**cfg.backtest.get("exec", {}))
+        df = run_backtest(cfg, variants=args.variants.split(",") if args.variants else None,
+                          queue_modes=tuple(args.queue.split(",")) if args.queue else QUEUE_MODES, ep=ep,
+                          profile=args.profile or cfg.backtest.get("profile", "moderate"),
+                          bankroll=float(args.bankroll or cfg.backtest.get("bankroll", 10_000)),
+                          limit=args.limit, workers=args.workers)
+        out = cfg.root / "data" / "backtest"
+        out.mkdir(parents=True, exist_ok=True)
+        df.to_csv(out / "windows.csv.gz", index=False)
+        meta = {"ep": asdict(ep), "profile": args.profile or cfg.backtest.get("profile", "moderate")}
+        (cfg.root / "docs" / "stage5-data.md").write_text(render_bt(df, meta), encoding="utf-8")
+        log.info("backtest: %d window results -> data/backtest/windows.csv.gz, docs/stage5-data.md", len(df))
+        return 0
+    if args.command in ("updown-replay", "updown-paper"):
+        from bosona.strategies.profiles import RiskProfile
+        from bosona.strategies.rules import BosonaRules, RulesParams
+        from bosona.updown import import_updown, replay, run_paper
+
+        U = import_updown(cfg.updown_path)
+        params = RulesParams(**{k: type(getattr(RulesParams(), k))(v) if not isinstance(getattr(RulesParams(), k), bool)
+                                else v.lower() in ("1", "true", "yes") for k, v in (x.split("=", 1) for x in args.param)})
+        profile = RiskProfile.of(args.profile or cfg.backtest.get("profile", "moderate"),
+                                 float(args.bankroll or cfg.backtest.get("bankroll", 10_000)))
+        react = None if args.react_ms is None or args.react_ms < 0 else args.react_ms / 1000.0
+        settings = dict(cfg.updown.get("settings", {}))
+        if args.command == "updown-paper":
+            res = await run_paper(U, lambda: BosonaRules(params), profile, cfg.root / "data" / "paper",
+                                  settings=settings, duration_s=args.duration, react_s=react, record=args.record)
+        else:
+            host, _winners = replay(U, args.paths, lambda: BosonaRules(params), profile, settings=settings, react_s=react)
+            res = host.results(await updown_payouts(cfg, list(host.ctx)))
+        print(json.dumps(summarize_windows(res), indent=2, default=float))
+        return 0
     if args.command == "live-report":
         from bosona.live.report import live_report
 
@@ -72,6 +112,14 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
         return 0
     if args.command == "validate":
         print(json.dumps(validate(conn), indent=2, ensure_ascii=False, default=str))
+        return 0
+    if args.command == "sync-tape":
+        from bosona.tape import connect as tape_connect
+        from bosona.tape import plan_sample, sync_tape
+
+        tc = tape_connect(cfg.tape_db_path)
+        log.info("tape sample: %s", plan_sample(cfg, tc, conn, args.n5m, args.n15m, args.seed))
+        log.info("tape: %s", await sync_tape(cfg, tc))
         return 0
     if args.command == "sample-orders":
         from bosona.orders import sample_orders
@@ -132,6 +180,30 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--taker", type=int, default=400, help="transactions sampled from his taker fills (total, tops up)")
     p.add_argument("--days", type=float, default=30, help="sample from the last N days (the public node keeps ~40)")
     sub.add_parser("stage4", help="stage 4: strategy tables -> docs/stage4-data.md, docs/stage4/segments.csv")
+    p = sub.add_parser("backtest", help="stage 5: (a)/(b)/(c) on the sampled windows -> docs/stage5-data.md")
+    p.add_argument("--variants", default=None, help="comma list (default: all; see bosona/backtest/run.py)")
+    p.add_argument("--queue", default=None, help="queue assumptions for maker orders: front,touch,through")
+    p.add_argument("--profile", default=None, help="risk profile of the own strategy (default: config backtest.profile)")
+    p.add_argument("--bankroll", type=float, default=None)
+    p.add_argument("--limit", type=int, default=None, help="only this many random windows (quick runs)")
+    p.add_argument("--workers", type=int, default=4)
+    for name, hlp in (("updown-replay", "stage 5: run the rules strategy over updown recordings (ticks-*.tsv.gz)"),
+                      ("updown-paper", "stage 5: live paper trading (DRY_RUN) with updown feeds; Ctrl+C stops")):
+        p = sub.add_parser(name, help=hlp)
+        if name == "updown-replay":
+            p.add_argument("paths", nargs="+", help="tick files or directories recorded by updown (shadow --record)")
+        else:
+            p.add_argument("--duration", type=float, default=None, help="stop after N seconds")
+            p.add_argument("--record", action="store_true", help="also record raw frames (updown format)")
+        p.add_argument("--profile", default=None)
+        p.add_argument("--bankroll", type=float, default=None)
+        p.add_argument("--react-ms", type=float, default=50.0,
+                       help="re-quote on Binance quotes at most every N ms (-1: only the 1 s timer)")
+        p.add_argument("--param", action="append", default=[], help="RulesParams override, e.g. margin=0.05")
+    p = sub.add_parser("sync-tape", help="stage 5: trade tapes of sampled BTC 5m/15m windows -> data/tape.db (tops up)")
+    p.add_argument("--n5m", type=int, default=3000, help="random BTC 5m windows (total, tops up)")
+    p.add_argument("--n15m", type=int, default=800, help="random BTC 15m windows (total, tops up)")
+    p.add_argument("--seed", type=int, default=5)
     p = sub.add_parser("track", help="stage 3: live tracker of new fills (Ctrl+C / SIGTERM stops it cleanly)")
     p.add_argument("--duration", type=float, default=None, help="stop after this many seconds (default: run until stopped)")
     p = sub.add_parser("live-report", help="stage 3: detection latency, price shift and Binance vs Chainlink summary")
@@ -149,3 +221,41 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+async def updown_payouts(cfg: Config, slugs: list[str]) -> dict[str, tuple[float, float]]:
+    """Payouts of windows seen in an updown replay: tape.db first, then Gamma by slug (stored in tape.db)."""
+    from bosona.tape import add_windows, fetch_meta
+    from bosona.tape import connect as tape_connect
+    from bosona.windows import TF_SECONDS
+
+    tc = tape_connect(cfg.tape_db_path)
+
+    def known() -> dict[str, tuple[float, float]]:
+        if not slugs:
+            return {}
+        q = ",".join("?" * len(slugs))
+        rows = tc.execute(f"SELECT m.slug, r.payout_up, r.payout_down FROM markets m JOIN resolutions r USING (condition_id) "
+                          f"WHERE m.slug IN ({q}) AND r.winner IS NOT NULL", slugs).fetchall()
+        return {r[0]: (float(r[1]), float(r[2])) for r in rows}
+
+    out = known()
+    missing = [s for s in slugs if s not in out]
+    for slug in missing:                              # <asset>-updown-<tf>-<start>
+        parts = slug.split("-")
+        if len(parts) == 4 and parts[2] in TF_SECONDS and parts[3].isdigit():
+            add_windows(tc, parts[0], parts[2], [int(parts[3])], "recording")
+    if missing:
+        async with ApiClient(cfg) as client:
+            await fetch_meta(cfg, client, tc, missing)
+        out = known()
+    return out
+
+
+def summarize_windows(res: list[dict]) -> dict:
+    done = [r for r in res if r.get("resolved")]
+    usdc = sum(r["usdc"] for r in done)
+    pnl = sum(r["pnl"] for r in done)
+    return {"windows": len(res), "settled": len(done), "fills": sum(r["fills"] for r in res),
+            "maker_fills": sum(r["maker_fills"] for r in res), "usdc_settled": round(usdc, 2), "pnl": round(pnl, 2),
+            "ev_per_usd": round(pnl / usdc, 4) if usdc else None, "unsettled_usdc": round(sum(r["usdc"] for r in res if not r.get("resolved")), 2)}

@@ -16,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+updown = ["requests>=2.31", "python-dotenv>=1.0", "tzdata>=2024.1"]   # to run strategies inside updown (bosona.updown)
 
 [project.scripts]
 bosona = "bosona.cli:main"

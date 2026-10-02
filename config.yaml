@@ -85,3 +85,24 @@ live:
       ws_url: wss://ws.dataengine.chain.link
       feeds:                                       # "<asset>:<kind>": feed id (or CHAINLINK_DS_FEEDS in .env)
         "btc:spot": "0x00039d9e45394f473ab1f050a1b963e6b05351e52d71e507509ada0c95ed75b8"   # BTC/USD (example in @chainlink/data-streams-sdk)
+
+# Stage 5: backtest base (`python -m bosona sync-tape`, `backtest`, `updown-replay`, `updown-paper`).
+backtest:
+  tape_db: data/tape.db                 # trade tapes of the sampled windows (Data API /v2/trades by condition)
+  profile: moderate                     # risk profile of the own strategy: conservative | moderate | aggressive
+  bankroll: 10000                       # USDC; the profile caps are fractions of it (mirrors updown risk/limits.py)
+  exec:                                 # see src/bosona/backtest/engine.py ExecParams
+    order_latency_s: 0.3                # decision -> order on the book
+    cancel_latency_s: 0.3
+    detect_after_match_s: 2.0           # stage 3: his fill is visible on-chain 2.0 s after the CLOB match
+    queue_shares: 222                   # BTC 5m median size at the touch (stage 3 books)
+    depth_per_tick: 222
+    ask_bias: 0.0                       # calibration of the tape-reconstructed ask against live books
+
+# updown (github.com/illnessbolen/updown): run bosona strategies inside its data path and paper exchange.
+updown:
+  path: ../illnessbolen/updown          # local checkout; or UPDOWN_PATH
+  settings:                             # updown Settings overrides (its own .env is not read)
+    BINANCE_WS_URL: wss://data-stream.binance.vision/stream
+    BINANCE_REST_URL: https://data-api.binance.vision
+    COINBASE_PRODUCTS: {}               # Coinbase is not among the sources of this project

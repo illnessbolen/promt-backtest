@@ -39,6 +39,8 @@ class Config:
     spot: dict[str, Any] = field(default_factory=dict)
     prices: dict[str, Any] = field(default_factory=dict)
     live: dict[str, Any] = field(default_factory=dict)
+    backtest: dict[str, Any] = field(default_factory=dict)
+    updown: dict[str, Any] = field(default_factory=dict)
     root: Path = field(default_factory=Path.cwd)
 
     @property
@@ -53,6 +55,16 @@ class Config:
     @property
     def live_db_path(self) -> Path:
         p = Path(os.environ.get("BOSONA_LIVE_DB_PATH") or self.live.get("db_path", "data/live.db"))
+        return p if p.is_absolute() else self.root / p
+
+    @property
+    def updown_path(self) -> Path:
+        p = Path(os.environ.get("UPDOWN_PATH") or self.updown.get("path", "../updown"))
+        return p if p.is_absolute() else self.root / p
+
+    @property
+    def tape_db_path(self) -> Path:
+        p = Path(os.environ.get("BOSONA_TAPE_DB_PATH") or self.backtest.get("tape_db", "data/tape.db"))
         return p if p.is_absolute() else self.root / p
 
 
@@ -85,5 +97,7 @@ def load_config(path: str | os.PathLike[str] | None = None, root: Path | None = 
         spot=raw.get("spot", {}),
         prices=raw.get("prices", {}),
         live=raw.get("live", {}),
+        backtest=raw.get("backtest", {}),
+        updown=raw.get("updown", {}),
         root=root,
     )
