@@ -79,18 +79,23 @@ def _worker(job: dict[str, Any]) -> list[dict[str, Any]]:
 def run_backtest(cfg: Config, variants: list[str] | None = None, queue_modes: tuple[str, ...] = QUEUE_MODES,
                  ep: ExecParams | None = None, profile: str | None = "moderate", bankroll: float = 10_000.0,
                  samples: tuple[str, ...] = ("random",), timeframe: str | None = None, limit: int | None = None,
-                 workers: int = 4) -> pd.DataFrame:
+                 workers: int = 4, rules: dict[str, Any] | None = None) -> pd.DataFrame:
+    """`rules`: RulesParams overrides for the own-strategy variants (c_*)."""
     tape = sqlite3.connect(cfg.tape_db_path)
     rows = window_list(tape, timeframe, samples)
     if limit:
         rows = rows.sample(min(limit, len(rows)), random_state=1).sort_values("window_start_ts")
     specs = {k: VARIANTS[k] for k in (variants or list(VARIANTS))}
+    if rules:
+        specs = {k: {**v, "params": replace(v["params"], **rules)} if v["kind"] == "rules" else v
+                 for k, v in specs.items()}
     ep = ep or ExecParams()
     chunks = [rows.iloc[i::workers * 4] for i in range(workers * 4)]
     jobs = [{"tape_db": str(cfg.tape_db_path), "db": str(cfg.db_path), "spot_dir": str(cfg.spot_cache_dir),
              "user": cfg.user, "rows": c.to_dict("records"), "ep": asdict(ep), "variants": specs,
              "queue_modes": queue_modes, "profile": profile, "bankroll": bankroll} for c in chunks if len(c)]
-    log.info("backtest: %d windows, variants %s, queue modes %s, %d jobs", len(rows), list(specs), queue_modes, len(jobs))
+    log.info("backtest: %d windows, variants %s, queue modes %s, rules %s, %d jobs", len(rows), list(specs),
+             queue_modes, rules or "default", len(jobs))
     out: list[dict[str, Any]] = []
     with ProcessPoolExecutor(max_workers=workers) as pool:
         for i, part in enumerate(pool.map(_worker, jobs)):

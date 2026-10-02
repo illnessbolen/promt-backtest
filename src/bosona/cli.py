@@ -63,32 +63,34 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
         from bosona.backtest.engine import ExecParams
         from bosona.backtest.report import render as render_bt
         from bosona.backtest.run import QUEUE_MODES, run_backtest
+        from bosona.strategies.rules import param_overrides
 
         ep = ExecParams(**cfg.backtest.get("exec", {}))
+        rules = param_overrides(args.param)
+        profile = args.profile or cfg.backtest.get("profile", "moderate")
         df = run_backtest(cfg, variants=args.variants.split(",") if args.variants else None,
                           queue_modes=tuple(args.queue.split(",")) if args.queue else QUEUE_MODES, ep=ep,
-                          profile=args.profile or cfg.backtest.get("profile", "moderate"),
-                          bankroll=float(args.bankroll or cfg.backtest.get("bankroll", 10_000)),
-                          limit=args.limit, workers=args.workers)
+                          profile=profile, bankroll=float(args.bankroll or cfg.backtest.get("bankroll", 10_000)),
+                          limit=args.limit, workers=args.workers, samples=tuple(args.samples.split(",")), rules=rules)
         out = cfg.root / "data" / "backtest"
         out.mkdir(parents=True, exist_ok=True)
-        df.to_csv(out / "windows.csv.gz", index=False)
-        meta = {"ep": asdict(ep), "profile": args.profile or cfg.backtest.get("profile", "moderate")}
-        (cfg.root / "docs" / "stage5-data.md").write_text(render_bt(df, meta), encoding="utf-8")
-        log.info("backtest: %d window results -> data/backtest/windows.csv.gz, docs/stage5-data.md", len(df))
+        extra = [x.replace("=", "") for x in args.param] + ([f"n{args.limit}"] if args.limit else [])
+        tag = "".join("-" + x for x in ([] if args.samples == "random" else [args.samples.replace(",", "-")]) + extra)
+        df.to_csv(out / f"windows{tag}.csv.gz", index=False)
+        meta = {"ep": asdict(ep), "profile": profile, "rules": rules or "по умолчанию"}
+        md = (out if extra else cfg.root / "docs") / f"stage5-data{tag}.md"     # --param / --limit runs stay in data/
+        md.write_text(render_bt(df, meta), encoding="utf-8")
+        log.info("backtest: %d window results -> %s, %s", len(df), out / f"windows{tag}.csv.gz", md)
         return 0
     if args.command in ("updown-replay", "updown-paper"):
-        from bosona.strategies.profiles import RiskProfile
-        from bosona.strategies.rules import BosonaRules, RulesParams
-        from bosona.updown import import_updown, replay, run_paper
+        from bosona.strategies.rules import BosonaRules, RulesParams, param_overrides
+        from bosona.updown import import_updown, replay, run_paper, updown_profile
 
         U = import_updown(cfg.updown_path)
-        params = RulesParams(**{k: type(getattr(RulesParams(), k))(v) if not isinstance(getattr(RulesParams(), k), bool)
-                                else v.lower() in ("1", "true", "yes") for k, v in (x.split("=", 1) for x in args.param)})
-        profile = RiskProfile.of(args.profile or cfg.backtest.get("profile", "moderate"),
-                                 float(args.bankroll or cfg.backtest.get("bankroll", 10_000)))
-        react = None if args.react_ms is None or args.react_ms < 0 else args.react_ms / 1000.0
+        params = RulesParams(**param_overrides(args.param))
         settings = dict(cfg.updown.get("settings", {}))
+        profile = updown_profile(U, settings, args.profile, float(args.bankroll or cfg.backtest.get("bankroll", 10_000)))
+        react = None if args.react_ms is None or args.react_ms < 0 else args.react_ms / 1000.0
         if args.command == "updown-paper":
             res = await run_paper(U, lambda: BosonaRules(params), profile, cfg.root / "data" / "paper",
                                   settings=settings, duration_s=args.duration, react_s=react, record=args.record)
@@ -187,6 +189,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--bankroll", type=float, default=None)
     p.add_argument("--limit", type=int, default=None, help="only this many random windows (quick runs)")
     p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--samples", default="random", help="window sets of tape.db: random (default), recording, live_run")
+    p.add_argument("--param", action="append", default=[],
+                   help="RulesParams override for the c_* variants, e.g. margin=0.05 (output gets a suffix)")
     for name, hlp in (("updown-replay", "stage 5: run the rules strategy over updown recordings (ticks-*.tsv.gz)"),
                       ("updown-paper", "stage 5: live paper trading (DRY_RUN) with updown feeds; Ctrl+C stops")):
         p = sub.add_parser(name, help=hlp)
@@ -195,7 +200,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             p.add_argument("--duration", type=float, default=None, help="stop after N seconds")
             p.add_argument("--record", action="store_true", help="also record raw frames (updown format)")
-        p.add_argument("--profile", default=None)
+        p.add_argument("--profile", default=None,
+                       help="conservative | moderate | aggressive (default: updown's RISK_PROFILE; RISK_* overrides apply)")
         p.add_argument("--bankroll", type=float, default=None)
         p.add_argument("--react-ms", type=float, default=50.0,
                        help="re-quote on Binance quotes at most every N ms (-1: only the 1 s timer)")

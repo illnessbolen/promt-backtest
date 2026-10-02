@@ -10,6 +10,8 @@ Binance market data and a public Polygon RPC. No orders, keys or wallets.
 - Stage 2 report: [`docs/stage2-context.md`](docs/stage2-context.md)
 - Stage 3 report: [`docs/stage3-live.md`](docs/stage3-live.md)
 - Stage 4 report: [`docs/stage4-strategy.md`](docs/stage4-strategy.md), tables: [`docs/stage4-data.md`](docs/stage4-data.md)
+- Stage 5 report: [`docs/stage5-backtest.md`](docs/stage5-backtest.md), tables: [`docs/stage5-data.md`](docs/stage5-data.md),
+  on the recorded L2 windows: [`docs/stage5-data-recording.md`](docs/stage5-data-recording.md)
 - Project plan and open questions: [`CLAUDE.md`](CLAUDE.md)
 
 ## Install
@@ -48,6 +50,15 @@ cp .env.example .env        # optional, only for overrides; no secrets are neede
 # stage 4: strategy analysis
 .venv/bin/python -m bosona sample-orders  # his order sizes / limit prices from matchOrders calldata of 1 200 recent tx (~4 min, tops up)
 .venv/bin/python -m bosona stage4         # all stage 4 tables -> docs/stage4-data.md, docs/stage4/segments.csv (~1 min)
+
+# stage 5: backtest base
+.venv/bin/python -m bosona sync-tape      # trade tapes of 3 000 random BTC 5m + 800 15m windows -> data/tape.db (~2.9 GB, tops up)
+.venv/bin/python -m bosona backtest       # (a)/(b)/(c) on the sampled windows -> docs/stage5-data.md (~2 min, 4 workers)
+.venv/bin/python -m bosona backtest --variants c_rules --queue touch --param margin=0.05   # rules grid point -> data/backtest/
+.venv/bin/python -m bosona backtest --samples recording --variants a_ideal,b_copy_taker_any,c_rules
+                                          # windows recorded with L2 books -> docs/stage5-data-recording.md
+.venv/bin/python -m bosona updown-replay data/updown/ticks          # rules on updown recordings (real L2), react 50 ms
+.venv/bin/python -m bosona updown-paper --profile conservative     # live paper trading (DRY_RUN) on updown feeds
 ```
 
 Logs go to `logs/bosona.log` (`logs/live.log` for the tracker) and stderr. Settings live in `config.yaml`, and `BOSONA_*` environment variables override them.
@@ -112,6 +123,30 @@ Tables of `data/live.db` (kept apart from `bosona.db` so the tracker never waits
 | `live_window_close` | Binance vs Chainlink at every close of the 5m/15m/4h windows, the winner each one implies, and the official strike/final/winner from Gamma |
 | `live_health` | once a minute: connection state, message counts and staleness of every feed |
 | `markets` | Gamma metadata of the windows seen live |
+
+## Backtest (stage 5)
+
+The same strategy object (`bosona/strategies`: `on_state` once a second and on spot moves, `on_signal` on his fills)
+runs in three places:
+
+- **Tape backtest** (`backtest/`). `sync-tape` downloads the full taker tape of each sampled window
+  (`/v2/trades?condition=…`, every taker order, newest first, paged by cursor) and its Gamma metadata into
+  `data/tape.db`. `proxy.py` reconstructs the top of book from the tape: ask = last buy of the token, bid = 1 − last buy
+  of the other token (minting), shifted back by the 2.4 s between the CLOB match and the block. `engine.py` replays a
+  window second by second on what was known then: order latency, taker execution at the reconstructed ask walking
+  `depth_per_tick` per 1¢ level with the taker fee, maker bids filled by prints at or through their price with a queue
+  assumption (front / touch / through), cancel latency, pairs worth $1, PnL at resolution. `run.py` runs the variants in
+  parallel and `report.py` writes the tables with window-clustered standard errors and the PnL decomposition
+  (pairs / unpaired, edge of the fills at the fill, 10 s later and at resolution).
+- **updown recordings** (`updown.py`, `updown-replay`): updown's own replay clock, hub, L2 books, Chainlink reference
+  and paper exchange (subclassed so that quotes rest and bids fill from the other outcome's buyers). updown is imported
+  from a checkout (`updown.path` in `config.yaml` or `UPDOWN_PATH`) and is not modified. Record with updown:
+  `python -m latarb shadow --record`, then point `updown-replay` at the tick files.
+- **Live paper / DRY_RUN** (`updown-paper`): the same host on updown's live feeds; no orders are sent, fills are
+  simulated by the paper exchange. Risk profiles `conservative | moderate | aggressive` mirror updown's
+  `risk/limits.py` (bet / exposure / daily stop as fractions of the bankroll); the daily stop and updown's kill-switch
+  file (`KILL_SWITCH_FILE`, default `STOP` in the working directory) pull every quote. Status:
+  `data/paper/paper_windows.json`.
 
 ## Strategy analysis (stage 4)
 

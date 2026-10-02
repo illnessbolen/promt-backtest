@@ -59,6 +59,17 @@ def import_updown(path: str | os.PathLike[str] | None) -> Any:
     return type("Updown", (), {n.replace(".", "_"): m for n, m in mods.items()})
 
 
+def updown_profile(U: Any, settings: dict[str, Any] | None, name: str | None, bankroll: float) -> RiskProfile:
+    """The risk profile as updown resolves it (risk/limits.py: its PROFILES, RISK_* overrides from the environment
+    or `settings`, hard bounds). `name` overrides updown's RISK_PROFILE (default there: conservative)."""
+    over = dict(settings or {})
+    if name:
+        over["RISK_PROFILE"] = name
+    lim = U.risk_limits.resolve_limits(U.config.load_settings(dotenv=False, **over))
+    log.info("risk: %s", lim.describe(bankroll))
+    return RiskProfile(lim.profile, bankroll, lim.bet_pct, lim.exposure_pct, lim.daily_stop_pct)
+
+
 def regime_for(label: str, resolution: str, start_ts: float) -> str:
     """Settlement rule of a window (stage 0, §4): Chainlink TWAP-60 since 2026-08-07 (5m: TWAP-30 until 08-14)."""
     if resolution != "chainlink":

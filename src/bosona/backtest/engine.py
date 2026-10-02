@@ -45,6 +45,7 @@ from bosona.strategies.base import (
 from bosona.strategies.profiles import RiskProfile
 
 EPS = 1e-9
+MARKOUT_S = 10.0                     # horizon of the post-fill markout in the diagnostics
 
 
 @dataclass
@@ -86,6 +87,7 @@ class WindowResult:
     cost: tuple[float, float] = (0.0, 0.0)
     fees: float = 0.0
     pnl: float = 0.0
+    diag: dict[str, float] = field(default_factory=dict)
 
     @property
     def usdc(self) -> float:
@@ -95,14 +97,16 @@ class WindowResult:
         maker = [f for f in self.fills if f.role == "maker"]
         taker = [f for f in self.fills if f.role == "taker"]
         copied = [f for f in self.fills if f.tag.startswith("copy@")]
-        return {"copy_shares": sum(f.shares for f in copied),
-                "copy_premium_usdc": sum(f.shares * (f.price - float(f.tag[5:])) + f.fee for f in copied),"variant": self.variant, "key": self.key, "timeframe": self.timeframe, "start": self.start,
+        return {"variant": self.variant, "key": self.key, "timeframe": self.timeframe, "start": self.start,
                 "sample": self.sample, "winner": self.winner, "fills": len(self.fills), "maker_fills": len(maker),
                 "taker_fills": len(taker), "usdc": self.usdc, "fees": self.fees, "pnl": self.pnl,
                 "maker_usdc": sum(f.price * f.shares for f in maker),
                 "taker_usdc": sum(f.price * f.shares + f.fee for f in taker),
                 "shares_up": self.shares[0], "shares_down": self.shares[1],
-                "paired": min(self.shares), "net": self.shares[0] - self.shares[1]}
+                "paired": min(self.shares), "net": self.shares[0] - self.shares[1],
+                "copy_shares": sum(f.shares for f in copied),
+                "copy_premium_usdc": sum(f.shares * (f.price - float(f.tag[5:])) + f.fee for f in copied),
+                **self.diag}
 
 
 @dataclass
@@ -298,7 +302,34 @@ class WindowSim:
         return WindowResult(variant=self.variant, key=self.w.key, timeframe=self.w.timeframe, start=int(self.w.start),
                             sample=wd.sample, winner=wd.winner, fills=self.fills,
                             shares=(self.inv.shares[0], self.inv.shares[1]),
-                            cost=(self.inv.cost[0], self.inv.cost[1]), fees=self.inv.fees, pnl=pnl)
+                            cost=(self.inv.cost[0], self.inv.cost[1]), fees=self.inv.fees, pnl=pnl,
+                            diag=self._diag(pnl))
+
+    def _diag(self, pnl: float) -> dict[str, float]:
+        """Where the PnL comes from. Pairs: the matched Up + Down shares at the average cost of each side (fees
+        included); the rest of the PnL is the unpaired (directional) part. Per role, the edge of the fills against
+        the model (fair value of the bought outcome - price - fee): at the fill, MARKOUT_S later and at resolution
+        (the payout; these sum to the PnL)."""
+        sh, cost = self.inv.shares, self.inv.cost
+        paired = min(sh)
+        pair_cost = paired * (cost[0] / sh[0] + cost[1] / sh[1]) if paired > EPS else 0.0
+        d = {"pair_cost_usdc": pair_cost, "pair_pnl": paired - pair_cost, "unpaired_pnl": pnl - (paired - pair_cost)}
+        for role in ("maker", "taker"):
+            d.update({f"{role}_shares": 0.0, f"{role}_fair_shares": 0.0, f"{role}_edge": 0.0, f"{role}_mark": 0.0,
+                      f"{role}_real": 0.0})
+        lag, last = round(MARKOUT_S / self.ep.step_s), len(self.grid) - 1
+        for f in self.fills:
+            role = "maker" if f.role == "maker" else "taker"
+            i = self._i(f.t)
+            up = (self.fair[i], self.fair[min(last, i + lag)])
+            fair = up if f.outcome == 0 else (1.0 - up[0], 1.0 - up[1])
+            d[f"{role}_shares"] += f.shares
+            d[f"{role}_real"] += f.shares * (self.wd.payout[f.outcome] - f.price) - f.fee
+            if np.isfinite(fair[0]) and np.isfinite(fair[1]):
+                d[f"{role}_fair_shares"] += f.shares
+                d[f"{role}_edge"] += f.shares * (fair[0] - f.price) - f.fee
+                d[f"{role}_mark"] += f.shares * (fair[1] - f.price) - f.fee
+        return d
 
 
 def simulate(wd: WindowData, strategy, ep: ExecParams, profile: RiskProfile | None, variant: str,

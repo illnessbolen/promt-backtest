@@ -167,4 +167,9 @@ python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'   # установ
 .venv/bin/python -m bosona live-report     # этап 3: задержки по каналам, сдвиг цены, цена копирования, Binance vs Chainlink
 .venv/bin/python -m bosona sample-orders   # этап 4: размеры и лимит-цены его ордеров из calldata (выборка 1 200 tx за 30 дней)
 .venv/bin/python -m bosona stage4          # этап 4: все таблицы разбора -> docs/stage4-data.md, docs/stage4/segments.csv
+.venv/bin/python -m bosona sync-tape       # этап 5: ленты сделок 3 000 случайных окон BTC 5m + 800 15m -> data/tape.db (докачивает)
+.venv/bin/python -m bosona backtest        # этап 5: сравнение (a)/(b)/(c) на ленте -> docs/stage5-data.md (~2 мин)
+.venv/bin/python -m bosona backtest --variants c_rules --queue touch --param margin=0.05   # точка сетки правил -> data/backtest/
+.venv/bin/python -m bosona updown-replay data/updown/ticks   # этап 5: правила на записях updown (настоящий L2)
+.venv/bin/python -m bosona updown-paper --profile conservative   # этап 5: paper (DRY_RUN) на живых данных updown
 ```

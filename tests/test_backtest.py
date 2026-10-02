@@ -29,7 +29,7 @@ from bosona.strategies.base import (
 )
 from bosona.strategies.copy import CopyParams, DelayedCopy
 from bosona.strategies.profiles import RiskProfile, cap_shares
-from bosona.strategies.rules import BosonaRules, RulesParams
+from bosona.strategies.rules import BosonaRules, RulesParams, param_overrides
 from bosona.tape import sample_slots, tape_rows
 
 START, END = 1_000_000, 1_000_300
@@ -154,6 +154,30 @@ def test_ideal_mode_books_his_fills():
            HisFill(DOWN, 0.55, 10, 5.5 + 0.17, 0.17, "taker", START + 60, START + 57.6, "0x2")]
     r = simulate(window_data([], his=his), None, ExecParams(), None, "a", "ideal")
     assert r.pnl == pytest.approx(10 * 1.0 - 4.0 - 5.67)
+
+
+def test_diagnostics_split_the_pnl():
+    his = [HisFill(UP, 0.40, 10, 4.0, 0.0, "maker", START + 50, START + 47.6, "0x1"),
+           HisFill(DOWN, 0.55, 10, 5.5 + 0.17, 0.17, "taker", START + 60, START + 57.6, "0x2"),
+           HisFill(UP, 0.45, 4, 1.8, 0.0, "maker", START + 70, START + 67.6, "0x3")]
+    sim = WindowSim(window_data([], his=his), None, ExecParams(), None, "a")
+    r = sim.run("ideal")
+    d = r.summary()
+    assert d["pair_pnl"] + d["unpaired_pnl"] == pytest.approx(r.pnl)
+    assert d["pair_cost_usdc"] == pytest.approx(10 * (5.8 / 14 + 5.67 / 10))       # average cost of each side
+    assert d["maker_real"] + d["taker_real"] == pytest.approx(r.pnl)               # edge at resolution sums to PnL
+    assert d["maker_shares"] == 14 and d["taker_shares"] == 10
+    fair = sim.fair[sim._i(START + 47.6)]                                         # flat spot: fair stays put
+    assert d["maker_fair_shares"] == 14
+    assert d["maker_edge"] == pytest.approx(10 * (fair - 0.40) + 4 * (fair - 0.45))
+    assert d["taker_mark"] == pytest.approx(10 * (1 - fair - 0.55) - 0.17)
+
+
+def test_rules_param_overrides():
+    assert param_overrides(["margin=0.05", "hedge=false", "anchor=fair", "improve_ticks=1"]) == {
+        "margin": 0.05, "hedge": False, "anchor": "fair", "improve_ticks": 1}
+    with pytest.raises(ValueError):
+        param_overrides(["no_such=1"])
 
 
 def test_copy_signal_is_seen_after_detection_delay():

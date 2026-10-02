@@ -1,8 +1,9 @@
 """Risk profiles conservative / moderate / aggressive.
 
 The fractions are those of updown (latarb/risk/limits.py, `PROFILES`), so a strategy sized here is sized the same
-way inside updown: every cap is a fraction of the CURRENT bankroll. Inside updown the adapter takes the limits
-from updown itself (`resolve_limits`), with its hard bounds and RISK_* overrides; this copy is for standalone runs.
+way inside updown: every cap is a fraction of the CURRENT bankroll. The updown commands take the limits from
+updown itself (bosona.updown.updown_profile: its hard bounds and RISK_* overrides); this copy serves the tape
+backtest, and a test checks that it matches updown.
 
 How they apply to a two-sided quoting strategy:
   * bet_pct       -> the most one order may cost (shares x price);

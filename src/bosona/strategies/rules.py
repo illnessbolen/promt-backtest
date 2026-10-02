@@ -20,7 +20,8 @@ Exit: none before resolution. Pairs are merged (PnL-neutral, frees capital); the
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+from typing import Any
 
 from bosona.backtest.pricing import taker_fee
 from bosona.strategies.base import DOWN, UP, Cancel, Intent, PlaceBid, State, TakerBuy
@@ -50,6 +51,18 @@ class RulesParams:
     taker_edge: float = 0.03
     taker_shares: float = 50.0
     taker_cooldown_s: float = 10.0
+
+
+def param_overrides(items: list[str]) -> dict[str, Any]:
+    """`k=v` strings (CLI --param) -> RulesParams fields with the field's type."""
+    types = {f.name: type(getattr(RulesParams(), f.name)) for f in fields(RulesParams)}
+    out: dict[str, Any] = {}
+    for item in items:
+        k, sep, v = item.partition("=")
+        if not sep or k not in types:
+            raise ValueError(f"unknown RulesParams override {item!r}; fields: {', '.join(types)}")
+        out[k] = v.lower() in ("1", "true", "yes") if types[k] is bool else types[k](v)
+    return out
 
 
 def floor_tick(p: float, tick: float) -> float:
