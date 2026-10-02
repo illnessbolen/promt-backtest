@@ -165,4 +165,6 @@ python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'   # установ
 .venv/bin/python -m bosona validate        # этап 2: покрытие, точность прокси, сверка PnL
 .venv/bin/python -m bosona track           # этап 3: live-трекер (Ctrl+C/SIGTERM — штатная остановка), data/live.db, logs/live.log
 .venv/bin/python -m bosona live-report     # этап 3: задержки по каналам, сдвиг цены, цена копирования, Binance vs Chainlink
+.venv/bin/python -m bosona sample-orders   # этап 4: размеры и лимит-цены его ордеров из calldata (выборка 1 200 tx за 30 дней)
+.venv/bin/python -m bosona stage4          # этап 4: все таблицы разбора -> docs/stage4-data.md, docs/stage4/segments.csv
 ```

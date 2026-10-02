@@ -1,0 +1,180 @@
+{
+ "source": "eth_getTransactionByHash on https://polygon-bor-rpc.publicnode.com (2026-10-02); input = CTF Exchange V2 matchOrders calldata",
+ "transactions": [
+  {
+   "hash": "0x77baeee51c31fd0bc98a661c28ab0e62373c468d7a9cbf9b7b6cad5fc0dbf485",
+   "blockNumber": "0x5a6fa85",
+   "to": "0xe111180000d2663c0091e4f400237545b87b996b",
+   "input_prefix": "0x3c2b4399edfba0b62512c363e1dd9f22c7aacb9aa07abb91dea3325525c6e70635b3b63e00000000000000000000000000000000000000000000000000000000000000e0…",
+   "decoded": {
+    "condition_id": "0xedfba0b62512c363e1dd9f22c7aacb9aa07abb91dea3325525c6e70635b3b63e",
+    "taker_order": {
+     "maker": "0xf27d40745542dc871e127acff3a1c9d3910d9a88",
+     "token_id": "38851252608279337583920346253890767944419982959107250923483873481527443555963",
+     "side": "BUY",
+     "maker_amount": 533610000,
+     "taker_amount": 539000000,
+     "timestamp": 1790948921219,
+     "signature_type": 1,
+     "fill": 533610000,
+     "fee": 373520
+    },
+    "maker_orders": [
+     {
+      "maker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+      "token_id": "96619953505818316659393858793585616170640475667677242223827491025837388995737",
+      "side": "BUY",
+      "maker_amount": 9960000,
+      "taker_amount": 996000000,
+      "timestamp": 0,
+      "signature_type": 3,
+      "fill": 5390000,
+      "fee": 0
+     }
+    ]
+   },
+   "his_orders_rows": [
+    {
+     "tx_hash": "0x77baeee51c31fd0bc98a661c28ab0e62373c468d7a9cbf9b7b6cad5fc0dbf485",
+     "k": 1,
+     "role": "maker",
+     "condition_id": "0xedfba0b62512c363e1dd9f22c7aacb9aa07abb91dea3325525c6e70635b3b63e",
+     "token_id": "96619953505818316659393858793585616170640475667677242223827491025837388995737",
+     "side": "BUY",
+     "salt": "8334",
+     "order_shares": 996.0,
+     "order_usdc": 9.96,
+     "limit_price": 0.01,
+     "fill_amount": 5.39,
+     "fee_amount": 0.0,
+     "signature_type": 3,
+     "order_ts": 0
+    }
+   ]
+  },
+  {
+   "hash": "0x376a64fdd9a7cb8d87304bc9d696051db936005cb618c159b9f4233d6908e8e5",
+   "blockNumber": "0x5a6f7f4",
+   "to": "0xe111180000d2663c0091e4f400237545b87b996b",
+   "input_prefix": "0x3c2b439969a75528020e9e0cb9bcead345379b04624ebd60a0c1db2e296698d24305740500000000000000000000000000000000000000000000000000000000000000e0…",
+   "decoded": {
+    "condition_id": "0x69a75528020e9e0cb9bcead345379b04624ebd60a0c1db2e296698d243057405",
+    "taker_order": {
+     "maker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+     "token_id": "88782190662854931224747013719779257233597207432226842019727772520462985082350",
+     "side": "BUY",
+     "maker_amount": 36524000,
+     "taker_amount": 79400000,
+     "timestamp": 0,
+     "signature_type": 3,
+     "fill": 4600000,
+     "fee": 173880
+    },
+    "maker_orders": [
+     {
+      "maker": "0xca2bc26fe3c8899616987bf0a1e078cc5ad33489",
+      "token_id": "79026741493904744682529678031289378846026804814619184799374173218615920064114",
+      "side": "BUY",
+      "maker_amount": 5400000,
+      "taker_amount": 10000000,
+      "timestamp": 1790947935604,
+      "signature_type": 0,
+      "fill": 5400000,
+      "fee": 0
+     }
+    ]
+   },
+   "his_orders_rows": [
+    {
+     "tx_hash": "0x376a64fdd9a7cb8d87304bc9d696051db936005cb618c159b9f4233d6908e8e5",
+     "k": 0,
+     "role": "taker",
+     "condition_id": "0x69a75528020e9e0cb9bcead345379b04624ebd60a0c1db2e296698d243057405",
+     "token_id": "88782190662854931224747013719779257233597207432226842019727772520462985082350",
+     "side": "BUY",
+     "salt": "842730",
+     "order_shares": 79.4,
+     "order_usdc": 36.524,
+     "limit_price": 0.46,
+     "fill_amount": 4.6,
+     "fee_amount": 0.17388,
+     "signature_type": 3,
+     "order_ts": 0
+    }
+   ]
+  },
+  {
+   "hash": "0x3de15f3dc34ee1fa87bd43590fd651d5c912271cc3f1923291c8caafd6a398bf",
+   "blockNumber": "0x591e53f",
+   "to": "0xe111180000d2663c0091e4f400237545b87b996b",
+   "input_prefix": "0x3c2b4399358144f00b745bed37dff8a6bbc43d76e274d4b804f5d8c2c0b8611e307d9ab800000000000000000000000000000000000000000000000000000000000000e0…",
+   "decoded": {
+    "condition_id": "0x358144f00b745bed37dff8a6bbc43d76e274d4b804f5d8c2c0b8611e307d9ab8",
+    "taker_order": {
+     "maker": "0xde4c3b4364e1ce99478df7b40c1fe91ce6006b32",
+     "token_id": "32031259569863778829281337947025949596698436772626909094723777376854583896536",
+     "side": "BUY",
+     "maker_amount": 100000000,
+     "taker_amount": 111111100,
+     "timestamp": 1788876259882,
+     "signature_type": 3,
+     "fill": 99999995,
+     "fee": 769990
+    },
+    "maker_orders": [
+     {
+      "maker": "0x31393e2f8333d4a6e2e31ca6424defe8b6cb9e2e",
+      "token_id": "29644613530027597884588808393580079070985086269394972652422672287956050886194",
+      "side": "BUY",
+      "maker_amount": 9900000,
+      "taker_amount": 90000000,
+      "timestamp": 1788876259546,
+      "signature_type": 2,
+      "fill": 2413400,
+      "fee": 0
+     },
+     {
+      "maker": "0xbd050887b28ef80590e25b0d0e4110154d930a55",
+      "token_id": "29644613530027597884588808393580079070985086269394972652422672287956050886194",
+      "side": "BUY",
+      "maker_amount": 550000,
+      "taker_amount": 5000000,
+      "timestamp": 0,
+      "signature_type": 2,
+      "fill": 550000,
+      "fee": 0
+     },
+     {
+      "maker": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+      "token_id": "29644613530027597884588808393580079070985086269394972652422672287956050886194",
+      "side": "BUY",
+      "maker_amount": 32670000,
+      "taker_amount": 297000000,
+      "timestamp": 0,
+      "signature_type": 3,
+      "fill": 9396150,
+      "fee": 0
+     }
+    ]
+   },
+   "his_orders_rows": [
+    {
+     "tx_hash": "0x3de15f3dc34ee1fa87bd43590fd651d5c912271cc3f1923291c8caafd6a398bf",
+     "k": 3,
+     "role": "maker",
+     "condition_id": "0x358144f00b745bed37dff8a6bbc43d76e274d4b804f5d8c2c0b8611e307d9ab8",
+     "token_id": "29644613530027597884588808393580079070985086269394972652422672287956050886194",
+     "side": "BUY",
+     "salt": "725454",
+     "order_shares": 297.0,
+     "order_usdc": 32.67,
+     "limit_price": 0.11,
+     "fill_amount": 9.39615,
+     "fee_amount": 0.0,
+     "signature_type": 3,
+     "order_ts": 0
+    }
+   ]
+  }
+ ]
+}

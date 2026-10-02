@@ -273,6 +273,35 @@ CREATE TABLE IF NOT EXISTS sync_state (
   note       TEXT,
   PRIMARY KEY (source, scope)
 );
+
+-- Stage 4: transactions whose calldata was read (sample of recent fills; the public node keeps ~40 days by hash).
+CREATE TABLE IF NOT EXISTS order_tx (
+  tx_hash      TEXT PRIMARY KEY,
+  stratum      TEXT,                -- role of the sampled fill: maker|taker
+  status       TEXT NOT NULL,       -- ok | not_found | other_call (not matchOrders)
+  block_number INTEGER,
+  n_orders     INTEGER,             -- orders in the match (taker + makers)
+  fetched_at   INTEGER NOT NULL
+);
+
+-- His orders in those transactions, decoded from matchOrders calldata. Amounts in USDC / shares (6 dp on-chain).
+CREATE TABLE IF NOT EXISTS order_samples (
+  tx_hash        TEXT NOT NULL,
+  k              INTEGER NOT NULL,  -- 0: the taker order of the match, i: maker order i-1
+  role           TEXT NOT NULL,     -- taker|maker
+  condition_id   TEXT,
+  token_id       TEXT NOT NULL,
+  side           TEXT NOT NULL,     -- BUY|SELL
+  salt           TEXT,              -- unique per order: the same order filled in several tx has one salt
+  order_shares   REAL,              -- full order size in shares
+  order_usdc     REAL,              -- full order size in USDC (shares x limit price)
+  limit_price    REAL,
+  fill_amount    REAL,              -- filled in this tx, in the order's maker asset (USDC for a BUY)
+  fee_amount     REAL,              -- fee charged in this tx
+  signature_type INTEGER,
+  order_ts       INTEGER,           -- Order.timestamp (0 for all of his orders seen so far)
+  PRIMARY KEY (tx_hash, k)
+);
 """
 
 

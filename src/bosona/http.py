@@ -102,3 +102,30 @@ class ApiClient:
                 log.warning("GET %s failed (%s), retry %d/%d in %.1fs", url, last_error, attempt + 1, self.max_retries, delay)
                 await asyncio.sleep(delay)
         raise ApiError(f"GET {url} params={params} failed after {self.max_retries + 1} attempts: {last_error}")
+
+    async def rpc(self, url: str, method: str, params: list[Any]) -> Any:
+        """JSON-RPC call (public Polygon node) with the same rate limiting and backoff; returns `result`."""
+        limiter = self._limiters.get(httpx.URL(url).host)
+        last_error = ""
+        for attempt in range(self.max_retries + 1):
+            if limiter:
+                await limiter.wait()
+            self.requests += 1
+            try:
+                resp = await self._client.post(url, json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
+                if resp.status_code == 200:
+                    d = resp.json()
+                    if "error" not in d:
+                        return d.get("result")
+                    last_error = f"RPC error {d['error']}"
+                else:
+                    last_error = f"HTTP {resp.status_code}: {resp.text[:300]}"
+                    if resp.status_code not in RETRY_STATUS:
+                        raise ApiError(f"{method} -> {last_error}")
+            except (httpx.TimeoutException, httpx.TransportError, ValueError) as exc:
+                last_error = f"{type(exc).__name__}: {exc}"
+            if attempt < self.max_retries:
+                delay = self._backoff(attempt)
+                log.warning("%s failed (%s), retry %d/%d in %.1fs", method, last_error, attempt + 1, self.max_retries, delay)
+                await asyncio.sleep(delay)
+        raise ApiError(f"{method} {params} failed after {self.max_retries + 1} attempts: {last_error}")

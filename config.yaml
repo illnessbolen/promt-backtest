@@ -28,6 +28,7 @@ rate_limits:
   gamma-api.polymarket.com: 12
   clob.polymarket.com: 40         # /prices-history: 1000 req / 10 s documented
   data-api.binance.vision: 30     # klines weight 2, 6000 weight / min per IP
+  polygon-bor-rpc.publicnode.com: 5   # public Polygon node: calldata of sampled transactions (stage 4)
 
 sync:
   history_start: 1          # /v2 feeds: start=1 means "full history" (0 would floor to 3 years back)

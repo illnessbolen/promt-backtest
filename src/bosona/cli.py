@@ -45,6 +45,18 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
 
         await run_tracker(cfg, duration_s=args.duration)
         return 0
+    if args.command == "stage4":
+        from bosona.spot import SpotCache
+        from bosona.strategy import render, run_all
+
+        conn = db.connect(cfg.db_path)
+        res = run_all(conn, SpotCache(cfg.spot_cache_dir), live_db=cfg.live_db_path)
+        out_dir = cfg.root / "docs" / "stage4"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        res["segments"].to_csv(out_dir / "segments.csv", index=False)
+        (cfg.root / "docs" / "stage4-data.md").write_text(render(res), encoding="utf-8")
+        log.info("stage 4: docs/stage4-data.md, docs/stage4/segments.csv (%d segments)", len(res["segments"]))
+        return 0
     if args.command == "live-report":
         from bosona.live.report import live_report
 
@@ -60,6 +72,12 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
         return 0
     if args.command == "validate":
         print(json.dumps(validate(conn), indent=2, ensure_ascii=False, default=str))
+        return 0
+    if args.command == "sample-orders":
+        from bosona.orders import sample_orders
+
+        res = await sample_orders(cfg, conn, n_maker=args.maker, n_taker=args.taker, days=args.days)
+        log.info("order sample: %s", res)
         return 0
     async with ApiClient(cfg) as client:
         t0 = time.monotonic()
@@ -109,6 +127,11 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("stage2", help="sync-spot + sync-prices + enrich")
     sub.add_parser("validate", help="stage 2 quality report: coverage, proxy accuracy, PnL reconciliation")
     sub.add_parser("stats", help="print row counts")
+    p = sub.add_parser("sample-orders", help="stage 4: his order sizes / limit prices from matchOrders calldata (public RPC)")
+    p.add_argument("--maker", type=int, default=800, help="transactions sampled from his maker fills (total, tops up)")
+    p.add_argument("--taker", type=int, default=400, help="transactions sampled from his taker fills (total, tops up)")
+    p.add_argument("--days", type=float, default=30, help="sample from the last N days (the public node keeps ~40)")
+    sub.add_parser("stage4", help="stage 4: strategy tables -> docs/stage4-data.md, docs/stage4/segments.csv")
     p = sub.add_parser("track", help="stage 3: live tracker of new fills (Ctrl+C / SIGTERM stops it cleanly)")
     p.add_argument("--duration", type=float, default=None, help="stop after this many seconds (default: run until stopped)")
     p = sub.add_parser("live-report", help="stage 3: detection latency, price shift and Binance vs Chainlink summary")

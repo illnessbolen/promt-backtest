@@ -9,6 +9,7 @@ Binance market data and a public Polygon RPC. No orders, keys or wallets.
 - Stage 1 report: [`docs/stage1-history.md`](docs/stage1-history.md)
 - Stage 2 report: [`docs/stage2-context.md`](docs/stage2-context.md)
 - Stage 3 report: [`docs/stage3-live.md`](docs/stage3-live.md)
+- Stage 4 report: [`docs/stage4-strategy.md`](docs/stage4-strategy.md), tables: [`docs/stage4-data.md`](docs/stage4-data.md)
 - Project plan and open questions: [`CLAUDE.md`](CLAUDE.md)
 
 ## Install
@@ -43,6 +44,10 @@ cp .env.example .env        # optional, only for overrides; no secrets are neede
 .venv/bin/python -m bosona track --duration 3600   # stop by itself after an hour
 .venv/bin/python -m bosona live-report    # latency per channel, price shift, copy cost, Binance vs Chainlink at closes
 .venv/bin/python -m bosona live-report --hours 24
+
+# stage 4: strategy analysis
+.venv/bin/python -m bosona sample-orders  # his order sizes / limit prices from matchOrders calldata of 1 200 recent tx (~4 min, tops up)
+.venv/bin/python -m bosona stage4         # all stage 4 tables -> docs/stage4-data.md, docs/stage4/segments.csv (~1 min)
 ```
 
 Logs go to `logs/bosona.log` (`logs/live.log` for the tracker) and stderr. Settings live in `config.yaml`, and `BOSONA_*` environment variables override them.
@@ -107,3 +112,16 @@ Tables of `data/live.db` (kept apart from `bosona.db` so the tracker never waits
 | `live_window_close` | Binance vs Chainlink at every close of the 5m/15m/4h windows, the winner each one implies, and the official strike/final/winner from Gamma |
 | `live_health` | once a minute: connection state, message counts and staleness of every feed |
 | `markets` | Gamma metadata of the windows seen live |
+
+## Strategy analysis (stage 4)
+
+`python -m bosona stage4` reads `bosona.db` (plus `live.db` for the top of book at his fills, if present) and writes every
+table of the stage 4 report to `docs/stage4-data.md` and the full segment table to `docs/stage4/segments.csv`.
+
+- `strategy.py`: EV per $1 with a market-clustered standard error, segments (asset x timeframe x price x time left),
+  pair trading with an exact PnL split (pairs / unpaired remainder / fees), open-add-reduce of every fill, 90c+ entries,
+  spot lead (alignment, matched random seconds, event study around sharp 3 s moves), market making, participation,
+  timing, sizing, daily and monthly stability.
+- `orders.py`: `sample-orders` reads `eth_getTransactionByHash` for a random sample of his recent transactions on the
+  public Polygon node (5 req/s) and decodes `matchOrders` calldata: full order size, limit price, fill and fee of his orders
+  (tables `order_tx`, `order_samples`). The node keeps transactions by hash for ~40 days, so the sample covers the last 30.
