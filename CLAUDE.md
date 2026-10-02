@@ -6,7 +6,7 @@
 
 ## Текущий статус
 
-Текущий этап: **4 — разбор стратегии** (этап 3 принят 2026-10-02, отчёт: `docs/stage3-live.md`; этап 2: `docs/stage2-context.md`; этап 1: `docs/stage1-history.md`; этап 0: `docs/stage0-recon.md`)
+Текущий этап: **5 — основа для бэктеста** (этап 4 принят 2026-10-02, отчёт: `docs/stage4-strategy.md`; этап 3: `docs/stage3-live.md`; этап 2: `docs/stage2-context.md`; этап 1: `docs/stage1-history.md`; этап 0: `docs/stage0-recon.md`)
 (обновляй эту строку после того, как я подтверждаю завершение этапа)
 
 ## Объект
