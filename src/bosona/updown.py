@@ -1,10 +1,12 @@
 """Run bosona strategies inside updown (github.com/illnessbolen/updown, package `latarb`).
 
-updown supplies the market-data path: WebSocket feeds or recorded ticks, its parsers, the hub with local L2 books,
-the Chainlink reference of each window, the replay clock and scheduler, and its paper exchange. bosona supplies the
-strategy (bosona.strategies) and the fair value (bosona.backtest.pricing), so the same strategy object runs on the
-tape backtest, on updown recordings and live in paper (DRY_RUN) mode with updown's risk profiles. Nothing in updown
-is modified: it is imported from a checkout (`updown.path` in config.yaml or UPDOWN_PATH).
+updown supplies the market-data path: WebSocket feeds or recorded ticks, its parsers, the hub with local L2 books
+and the Chainlink history, the replay clock and scheduler, and its paper exchange. bosona supplies the strategy
+(bosona.strategies), the fair value (bosona.backtest.pricing) and the strike of TWAP-settled windows (the oracle's
+TWAP over the minute before the open, StrategyHost._strike; updown's reference takes the tick at the open), so the
+same strategy object runs on the tape backtest, on updown recordings and live in paper (DRY_RUN) mode with updown's
+risk profiles. Nothing in updown is modified: it is imported from a checkout (`updown.path` in config.yaml or
+UPDOWN_PATH). Several strategies can share one replay pass (replay_many, used by bosona.updown_grid).
 
 Two execution changes, made in a subclass of updown's PaperExchange:
   * quotes rest until cancelled or the window ends. updown cancels makers after MAKER_TIMEOUT_MS (<= 10 s): right
@@ -16,6 +18,7 @@ Two execution changes, made in a subclass of updown's PaperExchange:
 
 from __future__ import annotations
 
+import bisect
 import dataclasses
 import importlib
 import logging
@@ -27,7 +30,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from bosona.backtest.diag import fill_stats, settle
 from bosona.backtest.pricing import TWAP_LOOKBACK_S, fair_up
+from bosona.backtest.proxy import MATCH_LAG_S
 from bosona.strategies.base import (
     Book,
     Cancel,
@@ -152,6 +157,13 @@ class WinCtx:
     orders: dict[str, tuple[Order, Any]] = field(default_factory=dict)   # our oid -> (Order, PaperOrder)
     fills: list[dict] = field(default_factory=list)
     winner: str | None = None
+    strike: float | None = None
+    fair_t: list[float] = field(default_factory=list)      # model P(Up) at most once a second (diagnostics)
+    fair_v: list[float] = field(default_factory=list)
+
+    def fair_up_at(self, t: float) -> float:
+        i = bisect.bisect_right(self.fair_t, t) - 1
+        return self.fair_v[i] if i >= 0 else math.nan
 
 
 class StrategyHost:
@@ -217,13 +229,40 @@ class StrategyHost:
             twap = sum(pts) / len(pts) if pts else None
         return mid * adj, ret, sigma, twap
 
+    def _strike(self, c: WinCtx, now: float) -> float | None:
+        """Price to beat. Gamma's priceToBeat once published (~1 min after the open, stage 0). Before that, for the
+        TWAP-settled windows (since 2026-08-07) the oracle's TWAP over the lookback before the open, from the
+        recorded Chainlink ticks (previous tick each second): on the stage 5 recording it is 0.08 bps from the
+        official strike (median; max 0.45), while the oracle tick at the open, which updown's ReferenceResolver
+        takes, is 2.1 bps off (median; max 13.4). Spot-settled windows keep updown's reference."""
+        if c.strike is not None:
+            return c.strike
+        w = c.w
+        if w.price_to_beat:
+            c.strike = float(w.price_to_beat)
+            return c.strike
+        lb = TWAP_LOOKBACK_S.get(c.window.regime or "")
+        if not lb:
+            ref, _ = self.refs.get(w, now)
+            return ref.price if ref is not None else None
+        st = self.hub.assets.get(w.asset)
+        last = st.oracle_hist.last() if st is not None else None
+        start = int(w.start_ts)
+        if last is None or last[0] < start - 1:        # the last second before the open has not arrived yet
+            return None
+        secs = range(start - lb, start)
+        pts = [st.oracle_hist.at(t) for t in secs]
+        if any(p is None or t - p[0] > self.cfg.ORACLE_STALE_S for t, p in zip(secs, pts, strict=True)):
+            return None                                 # joined after the averaging began: unpriced, as in updown
+        c.strike = sum(p[1] for p in pts) / lb
+        return c.strike
+
     def state(self, c: WinCtx, now: float) -> State | None:
         w = c.w
         books = self._books(w, now)
         if books is None:
             return None
-        ref, _ = self.refs.get(w, now)
-        c.window.strike = ref.price if ref is not None else None
+        c.window.strike = self._strike(c, now)
         spot, ret, sigma, twap = self._spot(w, now)
         fair = None
         if spot and c.window.strike and sigma:
@@ -257,6 +296,9 @@ class StrategyHost:
                 continue
             self._last_eval[w.slug] = now
             self.evaluations += 1
+            if s.fair_up is not None and (not c.fair_t or now - c.fair_t[-1] >= 1.0):
+                c.fair_t.append(now)
+                c.fair_v.append(s.fair_up)
             for it in c.strategy.on_state(s):
                 self._apply(c, it, now)
 
@@ -299,45 +341,121 @@ class StrategyHost:
         c.fills.append({"t": self.clock.now(), "outcome": k, "price": price, "shares": qty, "fee": fee,
                         "role": "maker" if maker else "taker", "tag": pair[0].tag if pair else ""})
 
-    def results(self, payouts: dict[str, tuple[float, float]]) -> list[dict]:
+    def snapshot(self, keep_fair: bool = False) -> list[dict]:
+        """Per window, everything that does not depend on the outcome (picklable; see window_rows)."""
         out = []
         for slug, c in self.ctx.items():
-            pay = payouts.get(slug)
-            pnl = (sum(c.inv.shares[k] * pay[k] for k in (0, 1)) - sum(c.inv.cost)) if pay else None
-            out.append({"slug": slug, "label": c.w.label, "start": c.w.start_ts, "fills": len(c.fills),
-                        "maker_fills": sum(f["role"] == "maker" for f in c.fills),
-                        "taker_fills": sum(f["role"] == "taker" for f in c.fills),
-                        "usdc": sum(c.inv.cost), "fees": c.inv.fees, "shares_up": c.inv.shares[0],
-                        "shares_down": c.inv.shares[1], "pnl": pnl, "resolved": pay is not None})
+            fills = [_Fill(f["t"], f["outcome"], f["price"], f["shares"], f["fee"], f["role"]) for f in c.fills]
+            d = {"slug": slug, "label": c.w.label, "start": c.w.start_ts, "end": c.w.end_ts, "fills": len(c.fills),
+                 "maker_fills": sum(f.role == "maker" for f in fills), "taker_fills": sum(f.role != "maker" for f in fills),
+                 "usdc": sum(c.inv.cost), "fees": c.inv.fees, "shares_up": c.inv.shares[0],
+                 "shares_down": c.inv.shares[1], "cost_up": c.inv.cost[0], "cost_down": c.inv.cost[1],
+                 "paired": min(c.inv.shares), **fill_stats(fills, c.fair_up_at)}
+            if keep_fair:
+                d["fair_t"], d["fair_v"] = list(c.fair_t), list(c.fair_v)
+            out.append(d)
         return out
 
+    def results(self, payouts: dict[str, tuple[float, float]]) -> list[dict]:
+        return window_rows(self.snapshot(), payouts)
 
-def replay(U: Any, paths: list[str], make_strategy: Callable[[], Any], profile: RiskProfile,
-           assets: tuple[str, ...] = ("btc",), labels: tuple[str, ...] = ("5m", "15m"),
-           settings: dict[str, Any] | None = None, react_s: float | None = None,
-           cancel_latency_s: float = 0.1) -> tuple[StrategyHost, dict[str, str]]:
-    """Feed recorded updown ticks through updown's hub and our strategy host (virtual time)."""
+
+@dataclass
+class _Fill:
+    t: float
+    outcome: int
+    price: float
+    shares: float
+    fee: float
+    role: str
+
+
+def window_rows(snapshot: list[dict], payouts: dict[str, tuple[float, float]]) -> list[dict]:
+    """Settle a host snapshot: PnL and its split (backtest/diag.py) for the windows whose outcome is known."""
+    out = []
+    for d in snapshot:
+        row = {k: v for k, v in d.items() if k not in ("fair_t", "fair_v")}
+        pay = payouts.get(d["slug"])
+        row["resolved"] = pay is not None
+        if pay is None:
+            row["pnl"] = None
+        else:
+            row.update(settle(d, (d["shares_up"], d["shares_down"]), (d["cost_up"], d["cost_down"]), pay))
+        out.append(row)
+    return out
+
+
+def his_rows(bos_conn: Any, slugs: list[str], payouts: dict[str, tuple[float, float]],
+             fair: dict[str, tuple[list[float], list[float]]]) -> list[dict]:
+    """His own fills (bosona.db) in the replayed windows, settled the same way: the "(a)" row of a grid. Fair values
+    come from a host's series of the same window; his fills are placed at the CLOB match (block - MATCH_LAG_S)."""
+    out = []
+    for slug in slugs:
+        fills, shares, cost, fees = [], [0.0, 0.0], [0.0, 0.0], 0.0
+        for outcome, price, size, usdc, fee, role, ts in bos_conn.execute(
+                "SELECT outcome, price, size, usdc, fee_usdc, role, ts FROM trades WHERE slug = ? AND side = 'BUY' "
+                "ORDER BY ts", (slug,)):
+            k = 0 if outcome == "Up" else 1
+            fills.append(_Fill(ts - MATCH_LAG_S, k, float(price), float(size), float(fee or 0.0), role))
+            shares[k] += float(size)
+            cost[k] += float(usdc)
+            fees += float(fee or 0.0)
+        ft, fv = fair.get(slug, ([], []))
+
+        def fair_up_at(t: float, ft=ft, fv=fv) -> float:
+            i = bisect.bisect_right(ft, t) - 1
+            return fv[i] if i >= 0 else math.nan
+
+        d = {"slug": slug, "fills": len(fills), "maker_fills": sum(f.role == "maker" for f in fills),
+             "taker_fills": sum(f.role != "maker" for f in fills), "usdc": sum(cost), "fees": fees,
+             "shares_up": shares[0], "shares_down": shares[1], "cost_up": cost[0], "cost_down": cost[1],
+             "paired": min(shares), **fill_stats(fills, fair_up_at)}
+        out.append(d)
+    return window_rows(out, payouts)
+
+
+@dataclass
+class HostSpec:
+    """One strategy configuration of a replay pass."""
+
+    label: str
+    make_strategy: Callable[[], Any]
+    react_s: float | None = None
+    cancel_latency_s: float = 0.1
+
+
+def replay_many(U: Any, paths: list[str], specs: list[HostSpec], profile: RiskProfile,
+                assets: tuple[str, ...] = ("btc",), labels: tuple[str, ...] = ("5m", "15m"),
+                settings: dict[str, Any] | None = None) -> tuple[list[StrategyHost], dict[str, str], tuple[float, float]]:
+    """Feed recorded updown ticks once through updown's hub to several strategy hosts (virtual time).
+
+    Each host has its own paper exchange, reference resolver and strategies; they only read the shared hub (books,
+    spot, trades), so a host's result does not depend on the others. Returns the hosts, the winners recorded in the ticks (@outcome)
+    and the time span of the recording."""
     cfg = U.config.load_settings(dotenv=False, **(settings or {}))
     cfg = dataclasses.replace(cfg, ASSETS=list(assets))
     clock = U.clock.ReplayClock()
     sched = U.scheduler.ReplayScheduler(clock)
     hub = U.data_hub.MarketDataHub(cfg, clock)
-    refs = U.data_reference.ReferenceResolver(cfg, hub)
-    host = StrategyHost(U, cfg, hub, clock, sched, refs, make_strategy, profile, assets, labels, react_s,
-                        cancel_latency_s)
+    refs = [U.data_reference.ReferenceResolver(cfg, hub) for _ in specs]   # its cache depends on when it is asked
+    hosts = [StrategyHost(U, cfg, hub, clock, sched, r, sp.make_strategy, profile, assets, labels, sp.react_s,
+                          sp.cancel_latency_s) for sp, r in zip(specs, refs, strict=True)]
     parsers = U.data_parsers.build_parsers(cfg.BINANCE_SYMBOLS, cfg.COINBASE_PRODUCTS, cfg.CHAINLINK_SYMBOLS)
     MW = U.data_markets.MarketWindow
     winners: dict[str, str] = {}
-    first = None
+    first = last = None
     for ts, src, raw in U.data_recorder.iter_recording(paths):
         if first is None:
             first = ts
-            sched.every(1.0, host.on_timer, ts)
+            for h in hosts:
+                sched.every(1.0, h.on_timer, ts)
+        last = ts
         sched.run_until(ts)
         clock.advance_to(ts)
         if src == "@markets":
             hub.set_markets(MW.from_dict(d) for d in U.fastjson.loads(raw))
-            refs.prune(set(hub.markets))
+            for r in refs:
+                r.prune(set(hub.markets))
         elif src == "@open":
             hub.on_feed_open(raw, ts)
         elif src == "@close":
@@ -353,7 +471,17 @@ def replay(U: Any, paths: list[str], make_strategy: Callable[[], Any], profile: 
             events = U.data_parsers.parse_safely(parser, raw, ts, [])
             if events:
                 hub.apply_many(events)
-    return host, winners
+    return hosts, winners, (first or 0.0, last or 0.0)
+
+
+def replay(U: Any, paths: list[str], make_strategy: Callable[[], Any], profile: RiskProfile,
+           assets: tuple[str, ...] = ("btc",), labels: tuple[str, ...] = ("5m", "15m"),
+           settings: dict[str, Any] | None = None, react_s: float | None = None,
+           cancel_latency_s: float = 0.1) -> tuple[StrategyHost, dict[str, str]]:
+    """Feed recorded updown ticks through updown's hub and our strategy host (virtual time)."""
+    hosts, winners, _span = replay_many(U, paths, [HostSpec("main", make_strategy, react_s, cancel_latency_s)],
+                                        profile, assets, labels, settings)
+    return hosts[0], winners
 
 
 async def run_paper(U: Any, make_strategy: Callable[[], Any], profile: RiskProfile, out_dir: Path,
@@ -418,11 +546,17 @@ async def run_paper(U: Any, make_strategy: Callable[[], Any], profile: RiskProfi
                 log.warning("paper job failed: %s", e)
             await asyncio.sleep(period)
 
+    market_set: set[str] = set()
+
     async def discovery_job() -> None:
+        nonlocal market_set
         await asyncio.to_thread(discovery.refresh)
         relevant = discovery.relevant(clock.now())
         hub.set_markets(relevant)
         refs.prune(set(hub.markets))
+        if recorder is not None and set(hub.markets) != market_set:   # replay needs the windows (as updown does)
+            recorder.write(clock.now(), "@markets", U.fastjson.dumps([w.to_dict() for w in relevant]))
+        market_set = set(hub.markets)
         await feeds.poly.set_tokens(t for w in relevant for t in w.tokens())
         feeds.poly.check_snapshots(clock.now())
 
@@ -437,6 +571,9 @@ async def run_paper(U: Any, make_strategy: Callable[[], Any], profile: RiskProfi
             winner = await asyncio.to_thread(gamma_mod.fetch_winner, gamma, slug)
             if winner:
                 payouts[slug] = (1.0, 0.0) if winner == "up" else (0.0, 1.0)
+                if recorder is not None:
+                    recorder.write(clock.now(), "@outcome", U.fastjson.dumps({"slug": slug, "winner": winner,
+                                                                              "window": c.w.to_dict()}))
                 pnl = sum(c.inv.shares[k] * payouts[slug][k] for k in (0, 1)) - sum(c.inv.cost)
                 day = time.strftime("%Y-%m-%d", time.gmtime(now))
                 day_pnl[day] = day_pnl.get(day, 0.0) + pnl

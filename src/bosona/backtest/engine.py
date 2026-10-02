@@ -32,6 +32,7 @@ from typing import Any
 import numpy as np
 
 from bosona.backtest.data import HisFill, WindowData
+from bosona.backtest.diag import pnl_split
 from bosona.backtest.pricing import TWAP_LOOKBACK_S, fair_up_array, taker_fee
 from bosona.strategies.base import (
     Book,
@@ -45,7 +46,6 @@ from bosona.strategies.base import (
 from bosona.strategies.profiles import RiskProfile
 
 EPS = 1e-9
-MARKOUT_S = 10.0                     # horizon of the post-fill markout in the diagnostics
 
 
 @dataclass
@@ -303,33 +303,11 @@ class WindowSim:
                             sample=wd.sample, winner=wd.winner, fills=self.fills,
                             shares=(self.inv.shares[0], self.inv.shares[1]),
                             cost=(self.inv.cost[0], self.inv.cost[1]), fees=self.inv.fees, pnl=pnl,
-                            diag=self._diag(pnl))
+                            diag=self._diag())
 
-    def _diag(self, pnl: float) -> dict[str, float]:
-        """Where the PnL comes from. Pairs: the matched Up + Down shares at the average cost of each side (fees
-        included); the rest of the PnL is the unpaired (directional) part. Per role, the edge of the fills against
-        the model (fair value of the bought outcome - price - fee): at the fill, MARKOUT_S later and at resolution
-        (the payout; these sum to the PnL)."""
-        sh, cost = self.inv.shares, self.inv.cost
-        paired = min(sh)
-        pair_cost = paired * (cost[0] / sh[0] + cost[1] / sh[1]) if paired > EPS else 0.0
-        d = {"pair_cost_usdc": pair_cost, "pair_pnl": paired - pair_cost, "unpaired_pnl": pnl - (paired - pair_cost)}
-        for role in ("maker", "taker"):
-            d.update({f"{role}_shares": 0.0, f"{role}_fair_shares": 0.0, f"{role}_edge": 0.0, f"{role}_mark": 0.0,
-                      f"{role}_real": 0.0})
-        lag, last = round(MARKOUT_S / self.ep.step_s), len(self.grid) - 1
-        for f in self.fills:
-            role = "maker" if f.role == "maker" else "taker"
-            i = self._i(f.t)
-            up = (self.fair[i], self.fair[min(last, i + lag)])
-            fair = up if f.outcome == 0 else (1.0 - up[0], 1.0 - up[1])
-            d[f"{role}_shares"] += f.shares
-            d[f"{role}_real"] += f.shares * (self.wd.payout[f.outcome] - f.price) - f.fee
-            if np.isfinite(fair[0]) and np.isfinite(fair[1]):
-                d[f"{role}_fair_shares"] += f.shares
-                d[f"{role}_edge"] += f.shares * (fair[0] - f.price) - f.fee
-                d[f"{role}_mark"] += f.shares * (fair[1] - f.price) - f.fee
-        return d
+    def _diag(self) -> dict[str, float]:
+        return pnl_split(self.fills, self.inv.shares, self.inv.cost, self.wd.payout,
+                         lambda t: float(self.fair[self._i(t)]))
 
 
 def simulate(wd: WindowData, strategy, ep: ExecParams, profile: RiskProfile | None, variant: str,

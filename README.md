@@ -59,6 +59,9 @@ cp .env.example .env        # optional, only for overrides; no secrets are neede
                                           # windows recorded with L2 books -> docs/stage5-data-recording.md
 .venv/bin/python -m bosona updown-replay data/updown/ticks          # rules on updown recordings (real L2), react 50 ms
 .venv/bin/python -m bosona updown-paper --profile conservative     # live paper trading (DRY_RUN) on updown feeds
+.venv/bin/python -m bosona updown-paper --record                   # same + records the ticks to data/paper/ticks
+.venv/bin/python -m bosona updown-grid data/paper/ticks            # rules grid on recordings -> data/backtest/updown-grid.md
+.venv/bin/python -m bosona updown-grid data/paper/ticks --grid my-grid.txt --tag week1   # own grid file
 ```
 
 Logs go to `logs/bosona.log` (`logs/live.log` for the tracker) and stderr. Settings live in `config.yaml`, and `BOSONA_*` environment variables override them.
@@ -138,10 +141,21 @@ runs in three places:
   assumption (front / touch / through), cancel latency, pairs worth $1, PnL at resolution. `run.py` runs the variants in
   parallel and `report.py` writes the tables with window-clustered standard errors and the PnL decomposition
   (pairs / unpaired, edge of the fills at the fill, 10 s later and at resolution).
-- **updown recordings** (`updown.py`, `updown-replay`): updown's own replay clock, hub, L2 books, Chainlink reference
-  and paper exchange (subclassed so that quotes rest and bids fill from the other outcome's buyers). updown is imported
+- **updown recordings** (`updown.py`, `updown-replay`): updown's own replay clock, hub, L2 books and paper exchange
+  (subclassed so that quotes rest and bids fill from the other outcome's buyers). The strike of a TWAP-settled
+  window is the Chainlink TWAP over the minute before the open, computed from the recorded ticks (0.08 bps from the
+  official one in median); updown's own reference takes the tick at the open (2.1 bps off in median, up to 13). updown is imported
   from a checkout (`updown.path` in `config.yaml` or `UPDOWN_PATH`) and is not modified. Record with updown:
-  `python -m latarb shadow --record`, then point `updown-replay` at the tick files.
+  `python -m latarb shadow --record` (or `updown-paper --record` here), then point `updown-replay` at the tick files.
+- **Grid on recordings** (`updown_grid.py`, `updown-grid`): every grid point is a strategy host fed by the same
+  replay, so a worker process parses the recording once for all its points (`--workers` processes share the points).
+  Results are settled from tape.db / Gamma and the recorded outcomes, and compared with his own fills in the same
+  windows (run `sync` after the recording). Output: `data/backtest/updown-grid[-tag].md` (one row per point, plus
+  his row first: EV with a window-clustered SE, pair cost, maker edge at the fill / 10 s later / at resolution) and
+  per-window `updown-grid[-tag].csv.gz`. A grid file has one point per line: `RulesParams` overrides `k=v`, plus
+  `react_ms` (-1 = only the 1 s timer) and `cancel_ms`; `default` is the strategy as it is, `#` starts a comment.
+  The default grid (`DEFAULT_GRID`) is the stage 5 tape grid plus two reaction speeds. Cost: about 1.5 min of CPU
+  per point and per hour of recording, plus one parse of the recording per worker.
 - **Live paper / DRY_RUN** (`updown-paper`): the same host on updown's live feeds; no orders are sent, fills are
   simulated by the paper exchange. Risk profiles `conservative | moderate | aggressive` mirror updown's
   `risk/limits.py` (bet / exposure / daily stop as fractions of the bankroll); the daily stop and updown's kill-switch

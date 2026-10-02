@@ -1,5 +1,7 @@
 """The updown adapter: run only when an updown checkout is available (config updown.path / UPDOWN_PATH)."""
 
+import dataclasses
+
 import pytest
 
 from bosona.config import load_config
@@ -69,3 +71,33 @@ def test_profiles_match_updown_and_overrides_apply(U, monkeypatch):
         assert updown_profile(U, {}, name, 10_000) == RiskProfile.of(name, 10_000)
     p = updown_profile(U, {"RISK_BET_PCT": 0.005}, None, 10_000)    # updown's default profile + an override
     assert p.name == "conservative" and p.max_order_usdc == pytest.approx(50.0)
+
+
+def test_strike_is_the_oracle_twap_before_the_open(U):
+    from bosona.strategies.profiles import RiskProfile
+    from bosona.updown import StrategyHost, WinCtx
+
+    start = 1_790_000_100                                   # TWAP-60 regime
+
+    def host_with_ticks(first: int, last: int):
+        cfg = U.config.load_settings(dotenv=False, ASSETS=("btc",))
+        clock = U.clock.ReplayClock(0.0)
+        hub = U.data_hub.MarketDataHub(cfg, clock)
+        for t in range(first, last + 1):                     # price = 100 + seconds since start - 70
+            hub.assets["btc"].oracle_hist.append(float(t), 100.0 + t - (start - 70))
+        return StrategyHost(U, cfg, hub, clock, U.scheduler.ReplayScheduler(clock),
+                            U.data_reference.ReferenceResolver(cfg, hub), lambda: None, RiskProfile.of("moderate"))
+
+    w = U.data_markets.MarketWindow(slug="btc-updown-5m-1790000100", asset="btc", label="5m", duration_s=300,
+                                    start_ts=start, end_ts=start + 300, up_token="U", down_token="D",
+                                    resolution="chainlink")
+    host = host_with_ticks(start - 70, start - 2)
+    c = WinCtx(w=w, strategy=None, window=host._window(w))
+    assert host._strike(c, start + 0.5) is None             # the last second before the open is not in yet
+    host = host_with_ticks(start - 70, start)
+    c = WinCtx(w=w, strategy=None, window=host._window(w))
+    assert host._strike(c, start + 1.0) == pytest.approx(100.0 + (10 + 69) / 2)   # not the tick at the open (170)
+    host = host_with_ticks(start - 30, start)               # joined after the averaging began: unpriced
+    assert host._strike(WinCtx(w=w, strategy=None, window=host._window(w)), start + 1.0) is None
+    known = dataclasses.replace(w, price_to_beat=123.0)     # Gamma's priceToBeat wins once published
+    assert host._strike(WinCtx(w=known, strategy=None, window=host._window(known)), start + 1.0) == 123.0

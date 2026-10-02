@@ -172,4 +172,6 @@ python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'   # установ
 .venv/bin/python -m bosona backtest --variants c_rules --queue touch --param margin=0.05   # точка сетки правил -> data/backtest/
 .venv/bin/python -m bosona updown-replay data/updown/ticks   # этап 5: правила на записях updown (настоящий L2)
 .venv/bin/python -m bosona updown-paper --profile conservative   # этап 5: paper (DRY_RUN) на живых данных updown
+.venv/bin/python -m bosona updown-paper --record    # то же + запись тиков в data/paper/ticks
+.venv/bin/python -m bosona updown-grid data/paper/ticks   # сетка правил на записи -> data/backtest/updown-grid.md
 ```

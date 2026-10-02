@@ -9,6 +9,7 @@ import logging
 import logging.handlers
 import sys
 import time
+from pathlib import Path
 
 from bosona import db
 from bosona.config import Config, load_config
@@ -99,6 +100,8 @@ async def _run(args: argparse.Namespace, cfg: Config) -> int:
             res = host.results(await updown_payouts(cfg, list(host.ctx)))
         print(json.dumps(summarize_windows(res), indent=2, default=float))
         return 0
+    if args.command == "updown-grid":
+        return await updown_grid_cmd(args, cfg)
     if args.command == "live-report":
         from bosona.live.report import live_report
 
@@ -206,6 +209,15 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--react-ms", type=float, default=50.0,
                        help="re-quote on Binance quotes at most every N ms (-1: only the 1 s timer)")
         p.add_argument("--param", action="append", default=[], help="RulesParams override, e.g. margin=0.05")
+    p = sub.add_parser("updown-grid", help="stage 5: grid of the rules over updown recordings -> data/backtest/updown-grid.md")
+    p.add_argument("paths", nargs="+", help="tick files or directories recorded by updown (shadow --record / updown-paper --record)")
+    p.add_argument("--grid", default=None, help="file with one grid point per line (default: bosona/updown_grid.py DEFAULT_GRID)")
+    p.add_argument("--react-ms", type=float, default=50.0, help="default reaction to Binance moves (-1: only the 1 s timer)")
+    p.add_argument("--profile", default=None, help="risk profile (default: updown's RISK_PROFILE)")
+    p.add_argument("--bankroll", type=float, default=None)
+    p.add_argument("--workers", type=int, default=4, help="processes; each parses the recording once")
+    p.add_argument("--all-windows", action="store_true", help="also windows the recording covers only in part")
+    p.add_argument("--tag", default="", help="suffix of the output files")
     p = sub.add_parser("sync-tape", help="stage 5: trade tapes of sampled BTC 5m/15m windows -> data/tape.db (tops up)")
     p.add_argument("--n5m", type=int, default=3000, help="random BTC 5m windows (total, tops up)")
     p.add_argument("--n15m", type=int, default=800, help="random BTC 15m windows (total, tops up)")
@@ -256,6 +268,67 @@ async def updown_payouts(cfg: Config, slugs: list[str]) -> dict[str, tuple[float
             await fetch_meta(cfg, client, tc, missing)
         out = known()
     return out
+
+
+async def updown_grid_cmd(args: argparse.Namespace, cfg: Config) -> int:
+    """Grid of the rules strategy over updown recordings -> data/backtest/updown-grid[-tag].{md,csv.gz}."""
+    import sqlite3
+    from datetime import UTC, datetime
+
+    from bosona.updown import import_updown, updown_profile
+    from bosona.updown_grid import (
+        DEFAULT_GRID,
+        grid_frames,
+        parse_grid,
+        render_grid,
+        run_pass,
+        summarize_grid,
+    )
+
+    U = import_updown(cfg.updown_path)
+    settings = dict(cfg.updown.get("settings", {}))
+    profile = updown_profile(U, settings, args.profile, float(args.bankroll or cfg.backtest.get("bankroll", 10_000)))
+    points = parse_grid((Path(args.grid).read_text(encoding="utf-8") if args.grid else DEFAULT_GRID).splitlines())
+    files = U.data_recorder.expand_paths(args.paths)
+    if not files:
+        log.error("updown-grid: no tick files in %s", args.paths)
+        return 1
+    t0 = time.monotonic()
+    res = run_pass(cfg.updown_path, files, points, profile, settings, args.react_ms, args.workers)
+    slugs = sorted({d["slug"] for snap in res["snapshots"].values() for d in snap})
+    try:
+        payouts = await updown_payouts(cfg, slugs)
+    except Exception as e:  # noqa: BLE001 - offline: the outcomes recorded in the ticks still settle windows
+        log.warning("updown-grid: outcomes from tape.db / Gamma failed (%s); using the recorded ones only", e)
+        payouts = {}
+    for slug, w in res["winners"].items():
+        payouts.setdefault(slug, (1.0, 0.0) if str(w).lower() == "up" else (0.0, 1.0))
+    bos = sqlite3.connect(cfg.db_path) if Path(cfg.db_path).exists() else None
+    df, his = grid_frames(res, payouts, points, args.react_ms, bos)
+    summary = summarize_grid(df, his, all_windows=args.all_windows)
+    a, b = (datetime.fromtimestamp(x, UTC) for x in res["span"])
+    shown = df[df["resolved"] & (True if args.all_windows else df["full"])] if not df.empty else df
+    meta = {"span": (f"{a:%Y-%m-%d %H:%M}–{b:%H:%M} UTC" if a.date() == b.date()
+                     else f"{a:%Y-%m-%d %H:%M} – {b:%Y-%m-%d %H:%M} UTC"),
+            "files": len(files), "profile": profile.name, "react_ms": args.react_ms,
+            "windows": (f"{shown['slug'].nunique()} " + ("разрешённых" if args.all_windows else
+                        "разрешённых и записанных от открытия до закрытия")) if not df.empty else "0"}
+    out = cfg.root / "data" / "backtest"
+    out.mkdir(parents=True, exist_ok=True)
+    tag = f"-{args.tag}" if args.tag else ""
+    df.to_csv(out / f"updown-grid{tag}.csv.gz", index=False)
+    if his is not None:
+        his.to_csv(out / f"updown-grid{tag}-his.csv.gz", index=False)
+    md = render_grid(summary, meta)
+    (out / f"updown-grid{tag}.md").write_text(md, encoding="utf-8")
+    print(md)
+    log.info("updown-grid: %d points, %d windows in %.0f s -> %s", len(points), len(slugs), time.monotonic() - t0,
+             out / f"updown-grid{tag}.md")
+    if his is None:
+        log.info("updown-grid: no bosona.db -> no row with his own fills")
+    elif not int(his["fills"].sum()):
+        log.info("updown-grid: no fills of his in these windows; run `python -m bosona sync` after the recording")
+    return 0
 
 
 def summarize_windows(res: list[dict]) -> dict:
