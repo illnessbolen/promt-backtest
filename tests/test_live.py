@@ -149,6 +149,9 @@ def test_data_api_events_seq_and_types():
            "usdc_size": 2.5, "timestamp": 100}
     evs = data_api_events([row, dict(row), {**row, "type": "MERGE"}], 1.0)
     assert [e.fill_key for e in evs] == ["0xab:1:BUY:5000000:0", "0xab:1:BUY:5000000:1"]
+    # a taker fill's usdc_size includes its fee; the event keeps chain semantics (size * price, fee apart)
+    taker = data_api_events([{**row, "size": 10, "price": 0.46, "usdc_size": 4.77388}], 1.0)[0]
+    assert taker.usdc == pytest.approx(4.6)
     occ = Occurrences()
     assert [occ.next("k"), occ.next("k"), occ.next("j")] == [0, 1, 0]
 

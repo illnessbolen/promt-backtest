@@ -41,7 +41,7 @@ class FillEvent:
     size: float
     seq: int = 0                       # occurrence of identical (tx, token, side, size) within the channel
     price: float | None = None
-    usdc: float | None = None
+    usdc: float | None = None          # size * price, without the taker fee (fee_usdc is separate)
     src_ts_ms: float | None = None     # timestamp attached by the channel
     block_ts: int | None = None
     block_number: int | None = None
@@ -322,7 +322,8 @@ def data_api_events(rows: list[dict[str, Any]], recv: float) -> list[FillEvent]:
         ev = FillEvent(
             channel="data_api", recv_ms=recv, tx_hash=str(r["transaction_hash"]).lower(), token_id=str(r["token_id"]),
             side=str(r["side"]), size=float(r["size"]), price=float(r["price"]) if r.get("price") is not None else None,
-            usdc=float(r["usdc_size"]) if r.get("usdc_size") is not None else None,
+            # not usdc_size: for a taker fill it includes the fee, while chain and RTDS amounts do not
+            usdc=round(float(r["size"]) * float(r["price"]), 6) if r.get("price") is not None else None,
             block_ts=int(r["timestamp"]), src_ts_ms=int(r["timestamp"]) * 1000.0,
             condition_id=str(r.get("condition_id") or "").lower() or None, slug=r.get("slug"), outcome=r.get("outcome"),
         )

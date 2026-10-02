@@ -84,11 +84,11 @@ CREATE TABLE IF NOT EXISTS trades (
   outcome           TEXT,
   outcome_index     INTEGER,
   side              TEXT NOT NULL,       -- BUY|SELL
-  price             REAL NOT NULL,       -- usdc / size as reported by the API
+  price             REAL NOT NULL,       -- execution price as reported by the API (without the taker fee)
   size_raw          INTEGER NOT NULL,    -- shares * 1e6
   usdc_raw          INTEGER NOT NULL,    -- usdc * 1e6
   size              REAL NOT NULL,
-  usdc              REAL NOT NULL,
+  usdc              REAL NOT NULL,       -- API usdcSize: size * price, plus the fee for a taker fill (on-chain pUSD sent)
   role              TEXT,                -- taker|maker (taker = present in /v2/trades?taker_only=true)
   fee_usdc          REAL,                -- taker: size*rate*p*(1-p) rounded to 5 dp; maker: 0
   fee_source        TEXT,                -- formula|chain
@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS market_context (
   px_age_s       INTEGER,
   winner         TEXT,
   payout         REAL,                 -- payout per share of the traded outcome (1, 0 or 0.5)
-  pnl_if_held    REAL,                 -- size * payout - usdc - fee; merging before resolution does not change it
+  pnl_if_held    REAL,                 -- size * payout - usdc (usdc includes the taker fee); merging does not change it
   computed_at    INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_context_cond ON market_context(condition_id);
@@ -243,7 +243,7 @@ CREATE TABLE IF NOT EXISTS episodes (
   winner          TEXT,
   payout_up       REAL,
   payout_down     REAL,
-  pnl             REAL,                -- up*payout_up + down*payout_down - costs - fees
+  pnl             REAL,                -- up*payout_up + down*payout_down - costs (costs include taker fees)
   computed_at     INTEGER NOT NULL
 );
 

@@ -271,6 +271,17 @@ def last_at_or_before(t: np.ndarray, p: np.ndarray, ts: int) -> tuple[float, int
     return (float(p[k]), int(ts - t[k])) if k >= 0 else (np.nan, None)
 
 
+def fill_pnl(side: np.ndarray, size: np.ndarray, usdc: np.ndarray, payout: np.ndarray) -> np.ndarray:
+    """PnL of a fill held to resolution, after fees.
+
+    `usdc` is the Data API `usdcSize`, which for a taker BUY already includes the fee: on-chain the wallet sends
+    size * price + fee in pUSD, and usdc - size * price = fee_usdc for every taker fill of the history. So the fee
+    is not subtracted again. A taker SELL is assumed symmetric (usdc = proceeds after the fee); the history has no
+    SELL fills to check it on."""
+    sign = np.where(side == "BUY", 1.0, -1.0)
+    return sign * (size * payout - usdc)
+
+
 def build_context(conn: sqlite3.Connection, cache: SpotCache, refs: pd.DataFrame) -> pd.DataFrame:
     tr = pd.read_sql(
         """
@@ -323,8 +334,7 @@ def build_context(conn: sqlite3.Connection, cache: SpotCache, refs: pd.DataFrame
         age[i] = max(ages) if ages else np.nan
 
     payout = np.where(tr["outcome"] == "Up", tr["payout_up"], tr["payout_down"]).astype(float)
-    sign = np.where(tr["side"] == "BUY", 1.0, -1.0)
-    pnl = sign * (tr["size"].to_numpy() * payout - tr["usdc"].to_numpy()) - tr["fee_usdc"].fillna(0).to_numpy()
+    pnl = fill_pnl(tr["side"].to_numpy(), tr["size"].to_numpy(), tr["usdc"].to_numpy(), payout)
 
     return pd.DataFrame({
         "trade_uid": tr["trade_uid"], "condition_id": tr["condition_id"], "asset": tr["asset"],
@@ -385,8 +395,9 @@ def build_episodes(conn: sqlite3.Connection) -> pd.DataFrame:
     ep["paired_shares"] = np.minimum(ep["up_shares"], ep["down_shares"]).clip(lower=0)
     ep["pair_cost"] = ep["avg_up_px"] + ep["avg_down_px"]
     ep["net_exposure"] = ep["up_shares"] - ep["down_shares"]
+    # costs are Data API usdc, which already include taker fees (see fill_pnl); `fees` is kept for information only
     ep["pnl"] = (ep["up_shares"] * ep["payout_up"] + ep["down_shares"] * ep["payout_down"]
-                 - ep["up_cost"] - ep["down_cost"] - ep["fees"])
+                 - ep["up_cost"] - ep["down_cost"])
     ep["computed_at"] = int(time.time())
     cols = [c for c in (
         "condition_id asset timeframe regime window_start_ts window_end_ts n_fills n_taker first_ts last_ts "
