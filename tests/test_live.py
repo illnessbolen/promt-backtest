@@ -344,3 +344,44 @@ def test_close_row_winners_and_divergence(tmp_path):
     # last Binance trade at or before the close (second 1299) vs the Chainlink observation of the close (1300)
     assert row["div_spot_bps"] == pytest.approx((100.299 * 1.0005 / 100.3 - 1) * 1e4)
     assert row["basis_bps"] == pytest.approx(5.0, abs=0.01)
+
+
+def test_price_book_flush_second_once():
+    seconds = []
+    pb = PriceBook(on_second=seconds.append)
+    pb.update(PriceTick("chainlink", "twap60", "btc", 1.0, 5_000.0, 6_400.0))
+    pb.flush_second("chainlink", "twap60", "btc")      # second 5 handed over early ...
+    pb.flush_second("chainlink", "twap60", "btc")
+    pb.update(PriceTick("chainlink", "twap60", "btc", 2.0, 6_000.0, 7_400.0))  # ... and not again when 6 starts
+    assert [t.price for t in seconds] == [1.0]
+
+
+def test_close_waits_for_the_end_second_tick(tmp_path, monkeypatch):
+    import types
+
+    import bosona.live.tracker as tr
+
+    st = LiveStore(tmp_path / "live.db")
+    t = types.SimpleNamespace(store=st, assets=["btc"], closes_done=set(), started_ms=0.0,
+                              s={"close_delay_s": 3, "close_timeframes": ["5m"], "max_close_wait_s": 15})
+    t.prices = PriceBook(on_second=st.add_spot)
+    for name in ("_bn_twap", "_close_row"):
+        setattr(t, name, getattr(Tracker, name).__get__(t))
+    ws, we = 1_000_200, 1_000_500
+    for sec in range(ws - 120, we):                    # Chainlink ticks up to the second before the end
+        t.prices.update(PriceTick("chainlink", "twap60", "btc", 100.0 + sec % 7, sec * 1000.0, 0))
+        t.prices.update(PriceTick("chainlink", "spot", "btc", 100.0, sec * 1000.0, 0))
+        t.prices.update(PriceTick("binance", "spot", "btc", 100.05, sec * 1000.0 + 300, 0))
+    monkeypatch.setattr(tr.time, "time", lambda: we + 4.0)
+    Tracker._record_closes(t)
+    st.flush()
+    assert st.conn.execute("SELECT COUNT(*) FROM live_window_close").fetchone()[0] == 0   # end tick not here yet
+    t.prices.update(PriceTick("chainlink", "twap60", "btc", 123.0, we * 1000.0, 0))
+    Tracker._record_closes(t)
+    st.flush()
+    row = st.conn.execute("SELECT cl_end, window_end_ts FROM live_window_close").fetchone()
+    assert tuple(row) == (123.0, we)
+    monkeypatch.setattr(tr.time, "time", lambda: we + 300 + 20.0)  # next window: tick never comes -> gives up
+    Tracker._record_closes(t)
+    st.flush()
+    assert st.conn.execute("SELECT COUNT(*) FROM live_window_close").fetchone()[0] == 2

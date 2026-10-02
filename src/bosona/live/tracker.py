@@ -55,6 +55,7 @@ DEFAULTS: dict[str, Any] = {
     "providers": {},
     "stale_s": 10,
     "block_minus_match_ms": 2300,   # prior for block ts - match time (two 2026-10-01 races: median 2.0-2.3 s)
+    "max_close_wait_s": 15,         # longest wait for the Chainlink tick of a window's end second
 }
 BACKFILL_MS = 60_000
 CHAINLINK_REGIMES = ("chainlink_spot", "chainlink_twap30", "chainlink_twap60")
@@ -437,7 +438,15 @@ class Tracker:
                 key = (asset, tf, we)
                 if key in self.closes_done:
                     continue
+                # RTDS delivers a Chainlink tick ~1.5 s after its timestamp, sometimes later: wait (up to
+                # max_close_wait_s) until the tick of the end second itself is here, else the value of the
+                # previous second would be taken for the window's final
+                last = self.prices.last("chainlink", "twap60", asset)
+                if (last is None or last.ts_ms < we * 1000) and now < we + float(self.s["max_close_wait_s"]):
+                    continue
                 self.closes_done.add(key)
+                self.prices.flush_second("chainlink", "twap60", asset)
+                self.prices.flush_second("chainlink", "spot", asset)
                 self.store.flush()
                 row = self._close_row(asset, tf, ws, we)
                 self.store.upsert("live_window_close", [row])

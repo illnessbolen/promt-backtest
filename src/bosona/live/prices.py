@@ -298,13 +298,15 @@ class PriceBook:
         self.on_second = on_second
         self.latest: dict[tuple[str, str, str], PriceTick] = {}
         self.history: dict[tuple[str, str, str], deque[PriceTick]] = {}
+        self._flushed: dict[tuple[str, str, str], int] = {}   # second already handed over early (flush_second)
 
     def update(self, tick: PriceTick) -> None:
         key = (tick.source, tick.kind, tick.asset)
         prev = self.latest.get(key)
         if prev is not None and tick.ts_ms < prev.ts_ms:
             return  # out-of-order frame: keep the newest state
-        if prev is not None and self.on_second and int(tick.ts_ms // 1000) > int(prev.ts_ms // 1000):
+        if prev is not None and self.on_second and int(tick.ts_ms // 1000) > int(prev.ts_ms // 1000) \
+                and self._flushed.get(key) != int(prev.ts_ms // 1000):
             self.on_second(prev)
         self.latest[key] = tick
         hist = self.history.setdefault(key, deque())
@@ -324,6 +326,14 @@ class PriceBook:
             if tick.ts_ms <= ts_ms:
                 return tick
         return None
+
+    def flush_second(self, source: str, kind: str, asset: str) -> None:
+        """Hand the current second of one key to `on_second` now (it is complete when the source sends one tick
+        per second, e.g. Chainlink). The same second is not handed over twice."""
+        tick = self.latest.get((source, kind, asset))
+        if tick is not None and self.on_second and self._flushed.get((source, kind, asset)) != int(tick.ts_ms // 1000):
+            self._flushed[(source, kind, asset)] = int(tick.ts_ms // 1000)
+            self.on_second(tick)
 
     def flush_seconds(self) -> None:
         """Hand the current (unfinished) second of every key to `on_second` (used on shutdown)."""
