@@ -1,0 +1,69 @@
+{
+ "_request": "GET /v2/status",
+ "_fetched_at": "2026-09-28T18:30Z",
+ "response": {
+  "data": {
+   "computed_at": "2026-09-28T18:30:19Z",
+   "age_seconds": 24,
+   "serving": {
+    "lag_seconds": 4,
+    "worst": "activity_feed",
+    "mechanisms": [
+     {
+      "name": "activity_feed",
+      "age_seconds": 4
+     },
+     {
+      "name": "custody_balances",
+      "age_seconds": 1,
+      "blocks_behind": 0
+     },
+     {
+      "name": "pnl",
+      "age_seconds": 1,
+      "blocks_behind": 2
+     }
+    ]
+   },
+   "ingestion": {
+    "cursors": 175,
+    "network": "polygon",
+    "chain_id": 137,
+    "max_synced_block": 94610052,
+    "min_synced_block": 94610051,
+    "most_lagged": {
+     "source": "auto_redeem_binary_redemption",
+     "block": 94610051,
+     "behind_max": 1
+    },
+    "lagging": [
+     {
+      "source": "auto_redeem_binary_redemption",
+      "block": 94610051,
+      "behind_max": 1
+     },
+     {
+      "source": "auto_redeem_v3_binary_redemption",
+      "block": 94610051,
+      "behind_max": 1
+     },
+     {
+      "source": "auto_redeem_v3_neg_risk_redemption",
+      "block": 94610051,
+      "behind_max": 1
+     },
+     {
+      "source": "binary_module_bridge_position_minted",
+      "block": 94610051,
+      "behind_max": 1
+     },
+     {
+      "source": "binary_module_condition_resolved",
+      "block": 94610051,
+      "behind_max": 1
+     }
+    ]
+   }
+  }
+ }
+}

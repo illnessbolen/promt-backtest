@@ -1,0 +1,11 @@
+{
+ "_request": "GET /v2/user-volume?user=0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+ "_fetched_at": "2026-09-28T18:30Z",
+ "response": {
+  "data": {
+   "volume": 20898052.241496,
+   "volume_usdc": 10516619.203224,
+   "trade_count": 544939
+  }
+ }
+}

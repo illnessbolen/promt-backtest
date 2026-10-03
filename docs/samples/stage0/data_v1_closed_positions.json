@@ -1,0 +1,44 @@
+{
+ "_request": "GET /closed-positions?user=0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed&limit=2",
+ "_fetched_at": "2026-09-28T18:30Z",
+ "response": [
+  {
+   "proxyWallet": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+   "asset": "5321344804676326320634477706882261157864183643461956235014241838224091082279",
+   "conditionId": "0x7fe2f748f6a06ce9d150260704a95cd1d4c96e41c46f50b9c2b46708f2227607",
+   "avgPrice": 0.2426,
+   "totalBought": 2708.0136,
+   "realizedPnl": 2051.0468,
+   "curPrice": 1,
+   "title": "Bitcoin Up or Down - August 13, 8:15PM-8:20PM ET",
+   "slug": "btc-updown-5m-1786666500",
+   "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/BTC+fullsize.png",
+   "eventSlug": "btc-updown-5m-1786666500",
+   "outcome": "Down",
+   "outcomeIndex": 1,
+   "oppositeOutcome": "Up",
+   "oppositeAsset": "85154192718201694914717133145816409310202931232725595668641203664656372980799",
+   "endDate": "2026-08-14",
+   "timestamp": 1786666965
+  },
+  {
+   "proxyWallet": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+   "asset": "102401896151127126822431270264690302137481292125767987955148533825326733415893",
+   "conditionId": "0x4bdf30260febdfa96067aa5c3c9a141f50fb59fe7018de56fbcdbc954c518821",
+   "avgPrice": 0.1994,
+   "totalBought": 2998.6868,
+   "realizedPnl": 2013.5085,
+   "curPrice": 1,
+   "title": "Bitcoin Up or Down - September 26, 3:20AM-3:25AM ET",
+   "slug": "btc-updown-5m-1790407200",
+   "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/BTC+fullsize.png",
+   "eventSlug": "btc-updown-5m-1790407200",
+   "outcome": "Up",
+   "outcomeIndex": 0,
+   "oppositeOutcome": "Down",
+   "oppositeAsset": "10669251499881551251714254116852379150814399606585277980685421330192337224169",
+   "endDate": "2026-09-26",
+   "timestamp": 1790407556
+  }
+ ]
+}

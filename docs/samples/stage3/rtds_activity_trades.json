@@ -1,0 +1,66 @@
+{
+ "_request": "wss://ws-live-data.polymarket.com",
+ "_fetched_at": "2026-10-01T18:20Z",
+ "subscribe_frame": {
+  "action": "subscribe",
+  "subscriptions": [
+   {
+    "topic": "activity",
+    "type": "trades"
+   }
+  ]
+ },
+ "_note": "public firehose of every Polymarket fill (~40 msg/s; 63% fee = 0, i.e. maker fills are included). Filtered client-side by proxyWallet. payload.timestamp is in seconds, typically 1 s before the block timestamp.",
+ "bosona_fill": {
+  "topic": "activity",
+  "type": "trades",
+  "timestamp": 1790879016354,
+  "payload": {
+   "asset": "49616855690172368864499903766804841832169352360797277625421404209014834159993",
+   "bio": "",
+   "conditionId": "0x2f41ab253d5fe3dad43e36ce54f40beb20c9d37e95621515d06c85a8ce7c1529",
+   "eventSlug": "btc-updown-5m-1790878800",
+   "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/BTC+fullsize.png",
+   "name": "bosona",
+   "outcome": "Up",
+   "outcomeIndex": 0,
+   "price": 0.85,
+   "profileImage": "",
+   "proxyWallet": "0xc2Ad03F79CA3F3c17D8c7De2612cE0C89b7D40Ed",
+   "pseudonym": "Impolite-Sister",
+   "side": "BUY",
+   "size": 996,
+   "slug": "btc-updown-5m-1790878800",
+   "timestamp": 1790879016,
+   "title": "Bitcoin Up or Down - October 1, 2:20PM-2:25PM ET",
+   "transactionHash": "0x46ffdba71e2aa25816b8c2b46cf3206fe7e53af2d93b49c0a9008edbeb33aaf1"
+  }
+ },
+ "other_fill": {
+  "connection_id": "gcMhgK7UIWeIKEjY6A==",
+  "payload": {
+   "asset": "16152876671315995936359777562477865263639055978235662529487029568997630120386",
+   "bio": "",
+   "conditionId": "0xddbdf0a513f9838e2de4b791ec79e4a4cb369da81a872272ab88fb71c4857934",
+   "eventSlug": "atp-mayo-smith-2026-10-01",
+   "fee": 0.22275,
+   "icon": "https://polymarket-upload.s3.us-east-2.amazonaws.com/atp-tour-b4390c4fb8.jpg",
+   "name": "TennisRedCard",
+   "outcome": "Aidan Mayo",
+   "outcomeIndex": 0,
+   "price": 0.55,
+   "profileImage": "",
+   "proxyWallet": "0x8d32B6C89B3efDB581dE4F0f7451955862A825A8",
+   "pseudonym": "Masculine-Hemisphere-Optimal",
+   "side": "BUY",
+   "size": 18,
+   "slug": "atp-mayo-smith-2026-10-01",
+   "timestamp": 1790877851,
+   "title": "Columbus: Aidan Mayo vs Colton Smith",
+   "transactionHash": "0x7ec37148e82095be85cc474bbc30da9fa02e17feec70f3d600e3d27d3c5b5db6"
+  },
+  "timestamp": 1790877851751,
+  "topic": "activity",
+  "type": "trades"
+ }
+}

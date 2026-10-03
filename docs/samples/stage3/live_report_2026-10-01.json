@@ -1,0 +1,997 @@
+{
+  "db": "/home/user/promt-backtest/data/live.db",
+  "latency": {
+    "fills": 175,
+    "backfilled": 0,
+    "first_channel": {
+      "chain_logs": 109,
+      "rtds_activity": 66
+    },
+    "roles": {
+      "maker": 153,
+      "taker": 22
+    },
+    "with_match_time": 164,
+    "first_seen_minus_block_ms": {
+      "p10": -1071.133,
+      "p50": -368.254,
+      "p90": 291.623,
+      "n": 175
+    },
+    "first_seen_minus_match_ms": {
+      "p10": 1052.877,
+      "p50": 2048.112,
+      "p90": 2960.554,
+      "n": 164
+    },
+    "block_minus_match_ms": {
+      "p10": 1615.8,
+      "p50": 2441.0,
+      "p90": 3160.6,
+      "n": 164
+    },
+    "per_channel": {
+      "chain_logs": {
+        "seen": 175,
+        "share_of_fills": 1.0,
+        "minus_block_ms": {
+          "p10": -1071.133,
+          "p50": -259.207,
+          "p90": 370.9,
+          "n": 175
+        },
+        "minus_match_ms": {
+          "p10": 1064.207,
+          "p50": 2173.937,
+          "p90": 3218.566,
+          "n": 164
+        }
+      },
+      "data_api": {
+        "seen": 175,
+        "share_of_fills": 1.0,
+        "minus_block_ms": {
+          "p10": 2352.88,
+          "p50": 8772.676,
+          "p90": 14349.266,
+          "n": 175
+        },
+        "minus_match_ms": {
+          "p10": 5120.572,
+          "p50": 11282.513,
+          "p90": 16951.985,
+          "n": 164
+        }
+      },
+      "rtds_activity": {
+        "seen": 173,
+        "share_of_fills": 0.989,
+        "minus_block_ms": {
+          "p10": -610.678,
+          "p50": -59.096,
+          "p90": 692.377,
+          "n": 173
+        },
+        "minus_match_ms": {
+          "p10": 1557.543,
+          "p50": 2471.557,
+          "p90": 3265.925,
+          "n": 162
+        }
+      }
+    },
+    "won_race": {
+      "chain_logs": 109,
+      "rtds_activity": 66
+    }
+  },
+  "price_shift": {
+    "headline_spot_source": {
+      "chainlink:spot": 160,
+      "binance:spot": 15
+    },
+    "spot_shift_bps": {
+      "p10": -0.088,
+      "p50": 0.0,
+      "p90": 0.07,
+      "n": 175
+    },
+    "abs_spot_shift_bps": {
+      "p10": 0.0,
+      "p50": 0.004,
+      "p90": 0.328,
+      "n": 175
+    },
+    "by_source": {
+      "binance:spot": {
+        "shift_bps": {
+          "p10": -0.001,
+          "p50": 0.0,
+          "p90": 0.139,
+          "n": 175
+        },
+        "abs_shift_bps": {
+          "p10": 0.0,
+          "p50": 0.001,
+          "p90": 1.011,
+          "n": 175
+        },
+        "detect_tick_age_ms": {
+          "p10": 39.847,
+          "p50": 246.391,
+          "p90": 1162.776,
+          "n": 175
+        }
+      },
+      "chainlink:spot": {
+        "shift_bps": {
+          "p10": -0.099,
+          "p50": 0.0,
+          "p90": 0.07,
+          "n": 175
+        },
+        "abs_shift_bps": {
+          "p10": 0.0,
+          "p50": 0.004,
+          "p90": 0.277,
+          "n": 175
+        },
+        "detect_tick_age_ms": {
+          "p10": 32.662,
+          "p50": 549.993,
+          "p90": 1252.265,
+          "n": 175
+        }
+      },
+      "chainlink:twap60": {
+        "shift_bps": {
+          "p10": -0.042,
+          "p50": 0.0,
+          "p90": 0.041,
+          "n": 175
+        },
+        "abs_shift_bps": {
+          "p10": 0.0,
+          "p50": 0.01,
+          "p90": 0.087,
+          "n": 175
+        },
+        "detect_tick_age_ms": {
+          "p10": 158.044,
+          "p50": 622.623,
+          "p90": 1182.842,
+          "n": 175
+        }
+      }
+    },
+    "token": {
+      "mid_shift_c": {
+        "p10": -8.0,
+        "p50": 0.0,
+        "p90": 3.4,
+        "n": 163
+      },
+      "ask_shift_c_buys": {
+        "p10": -10.0,
+        "p50": 0.0,
+        "p90": 2.8,
+        "n": 163
+      },
+      "copy_best_minus_his_price_c_buys": {
+        "p10": -8.8,
+        "p50": 1.0,
+        "p90": 6.0,
+        "n": 172
+      },
+      "copy_vwap_slip_c": {
+        "p10": -7.0,
+        "p50": 1.0,
+        "p90": 7.214,
+        "n": 171
+      },
+      "share_copy_possible_at_his_price_or_better": 0.392,
+      "share_with_full_depth": 0.977
+    },
+    "copy_extra_cost_c_per_share": {
+      "p10": -5.503,
+      "p50": 1.685,
+      "p90": 8.954,
+      "n": 171,
+      "mean": 0.479
+    },
+    "by_role": {
+      "maker": {
+        "fills": 153,
+        "copy_vwap_slip_c": {
+          "p10": -7.0,
+          "p50": 1.0,
+          "p90": 7.283,
+          "n": 149
+        },
+        "copy_extra_cost_c_per_share": {
+          "p10": -5.52,
+          "p50": 1.685,
+          "p90": 8.96,
+          "n": 149
+        },
+        "copy_extra_cost_c_per_share_mean": 0.744,
+        "spot_shift_abs_bps": {
+          "p10": 0.0,
+          "p50": 0.003,
+          "p90": 0.306,
+          "n": 153
+        }
+      },
+      "taker": {
+        "fills": 22,
+        "copy_vwap_slip_c": {
+          "p10": -5.218,
+          "p50": -0.0,
+          "p90": 5.807,
+          "n": 22
+        },
+        "copy_extra_cost_c_per_share": {
+          "p10": -5.047,
+          "p50": 0.0,
+          "p90": 5.817,
+          "n": 22
+        },
+        "copy_extra_cost_c_per_share_mean": -1.319,
+        "spot_shift_abs_bps": {
+          "p10": 0.0,
+          "p50": 0.026,
+          "p90": 0.767,
+          "n": 22
+        }
+      }
+    }
+  },
+  "copy_pnl": {
+    "resolved_fills": 173,
+    "copyable_fills": 169,
+    "all": {
+      "fills": 173,
+      "copyable": 169,
+      "his_pnl": -2357.53,
+      "his_pnl_per_usdc": -0.2867,
+      "copy_pnl": -2645.41,
+      "copy_pnl_per_usdc": -0.3108,
+      "avg_extra_cost_c_per_share": 0.46
+    },
+    "by_role": {
+      "maker": {
+        "fills": 152,
+        "copyable": 148,
+        "his_pnl": -1579.08,
+        "his_pnl_per_usdc": -0.3048,
+        "copy_pnl": -2002.81,
+        "copy_pnl_per_usdc": -0.3573,
+        "avg_extra_cost_c_per_share": 0.73
+      },
+      "taker": {
+        "fills": 21,
+        "copyable": 21,
+        "his_pnl": -778.44,
+        "his_pnl_per_usdc": -0.2559,
+        "copy_pnl": -642.6,
+        "copy_pnl_per_usdc": -0.2211,
+        "avg_extra_cost_c_per_share": -1.38
+      }
+    },
+    "by_timeframe": {
+      "15m": {
+        "fills": 27,
+        "copyable": 27,
+        "his_pnl": 19.06,
+        "his_pnl_per_usdc": 0.014,
+        "copy_pnl": -248.81,
+        "copy_pnl_per_usdc": -0.1524,
+        "avg_extra_cost_c_per_share": 5.09
+      },
+      "1h": {
+        "fills": 14,
+        "copyable": 13,
+        "his_pnl": -2.16,
+        "his_pnl_per_usdc": -0.0035,
+        "copy_pnl": -42.28,
+        "copy_pnl_per_usdc": -0.0649,
+        "avg_extra_cost_c_per_share": 3.55
+      },
+      "4h": {
+        "fills": 2,
+        "copyable": 2,
+        "his_pnl": 4.4,
+        "his_pnl_per_usdc": 0.0941,
+        "copy_pnl": 2.78,
+        "copy_pnl_per_usdc": 0.0576,
+        "avg_extra_cost_c_per_share": 3.18
+      },
+      "5m": {
+        "fills": 130,
+        "copyable": 127,
+        "his_pnl": -2378.82,
+        "his_pnl_per_usdc": -0.3836,
+        "copy_pnl": -2357.1,
+        "copy_pnl_per_usdc": -0.3815,
+        "avg_extra_cost_c_per_share": -0.88
+      }
+    }
+  },
+  "window_closes": {
+    "closes": 138,
+    "with_both_sources": 108,
+    "per_series": {
+      "bnb 15m": {
+        "closes": 6,
+        "div_spot_bps": {
+          "p10": 4.565,
+          "p50": 4.952,
+          "p90": 5.242,
+          "n": 6
+        },
+        "div_twap_bps": {
+          "p10": 4.573,
+          "p50": 4.694,
+          "p90": 4.988,
+          "n": 6
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.022,
+          "p50": 0.116,
+          "p90": 0.25,
+          "n": 6
+        },
+        "abs_move_bps": {
+          "p10": 3.172,
+          "p50": 6.543,
+          "p90": 16.964,
+          "n": 5
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.023,
+          "p50": 0.151,
+          "p90": 0.281,
+          "n": 5
+        },
+        "winner_disagree": 0
+      },
+      "bnb 4h": {
+        "closes": 1,
+        "div_spot_bps": {
+          "p10": 5.275,
+          "p50": 5.275,
+          "p90": 5.275,
+          "n": 1
+        },
+        "div_twap_bps": {
+          "p10": 5.132,
+          "p50": 5.132,
+          "p90": 5.132,
+          "n": 1
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.026,
+          "p50": 0.026,
+          "p90": 0.026,
+          "n": 1
+        },
+        "abs_move_bps": null,
+        "anchored_binance_proxy_abs_err_bps": null,
+        "winner_disagree": 0
+      },
+      "bnb 5m": {
+        "closes": 16,
+        "div_spot_bps": {
+          "p10": 4.382,
+          "p50": 4.898,
+          "p90": 5.215,
+          "n": 15
+        },
+        "div_twap_bps": {
+          "p10": 4.454,
+          "p50": 4.77,
+          "p90": 5.078,
+          "n": 15
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.016,
+          "p50": 0.051,
+          "p90": 0.299,
+          "n": 15
+        },
+        "abs_move_bps": {
+          "p10": 1.388,
+          "p50": 4.005,
+          "p90": 12.627,
+          "n": 13
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.023,
+          "p50": 0.169,
+          "p90": 0.417,
+          "n": 13
+        },
+        "winner_disagree": 0
+      },
+      "btc 15m": {
+        "closes": 6,
+        "div_spot_bps": {
+          "p10": 4.564,
+          "p50": 4.901,
+          "p90": 5.013,
+          "n": 6
+        },
+        "div_twap_bps": {
+          "p10": 4.251,
+          "p50": 4.396,
+          "p90": 4.79,
+          "n": 6
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.185,
+          "p50": 0.24,
+          "p90": 0.304,
+          "n": 6
+        },
+        "abs_move_bps": {
+          "p10": 1.056,
+          "p50": 3.512,
+          "p90": 19.412,
+          "n": 5
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.082,
+          "p50": 0.424,
+          "p90": 0.562,
+          "n": 5
+        },
+        "winner_disagree": 0
+      },
+      "btc 4h": {
+        "closes": 1,
+        "div_spot_bps": {
+          "p10": 4.922,
+          "p50": 4.922,
+          "p90": 4.922,
+          "n": 1
+        },
+        "div_twap_bps": {
+          "p10": 4.404,
+          "p50": 4.404,
+          "p90": 4.404,
+          "n": 1
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.224,
+          "p50": 0.224,
+          "p90": 0.224,
+          "n": 1
+        },
+        "abs_move_bps": null,
+        "anchored_binance_proxy_abs_err_bps": null,
+        "winner_disagree": 0
+      },
+      "btc 5m": {
+        "closes": 16,
+        "div_spot_bps": {
+          "p10": 4.269,
+          "p50": 4.628,
+          "p90": 5.027,
+          "n": 15
+        },
+        "div_twap_bps": {
+          "p10": 4.221,
+          "p50": 4.484,
+          "p90": 4.802,
+          "n": 15
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.056,
+          "p50": 0.197,
+          "p90": 0.306,
+          "n": 15
+        },
+        "abs_move_bps": {
+          "p10": 0.683,
+          "p50": 6.052,
+          "p90": 13.568,
+          "n": 13
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.075,
+          "p50": 0.269,
+          "p90": 0.568,
+          "n": 13
+        },
+        "winner_disagree": 0
+      },
+      "doge 15m": {
+        "closes": 6,
+        "div_spot_bps": {
+          "p10": 4.724,
+          "p50": 5.166,
+          "p90": 6.022,
+          "n": 6
+        },
+        "div_twap_bps": {
+          "p10": 4.782,
+          "p50": 5.272,
+          "p90": 5.816,
+          "n": 6
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.042,
+          "p50": 0.194,
+          "p90": 0.388,
+          "n": 6
+        },
+        "abs_move_bps": {
+          "p10": 5.187,
+          "p50": 13.108,
+          "p90": 42.28,
+          "n": 5
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.114,
+          "p50": 0.304,
+          "p90": 0.734,
+          "n": 5
+        },
+        "winner_disagree": 0
+      },
+      "doge 4h": {
+        "closes": 1,
+        "div_spot_bps": {
+          "p10": 6.356,
+          "p50": 6.356,
+          "p90": 6.356,
+          "n": 1
+        },
+        "div_twap_bps": {
+          "p10": 5.968,
+          "p50": 5.968,
+          "p90": 5.968,
+          "n": 1
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.194,
+          "p50": 0.194,
+          "p90": 0.194,
+          "n": 1
+        },
+        "abs_move_bps": null,
+        "anchored_binance_proxy_abs_err_bps": null,
+        "winner_disagree": 0
+      },
+      "doge 5m": {
+        "closes": 16,
+        "div_spot_bps": {
+          "p10": 4.131,
+          "p50": 5.295,
+          "p90": 6.096,
+          "n": 15
+        },
+        "div_twap_bps": {
+          "p10": 4.774,
+          "p50": 5.071,
+          "p90": 5.865,
+          "n": 15
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.048,
+          "p50": 0.195,
+          "p90": 0.518,
+          "n": 15
+        },
+        "abs_move_bps": {
+          "p10": 4.368,
+          "p50": 13.565,
+          "p90": 20.359,
+          "n": 13
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.05,
+          "p50": 0.404,
+          "p90": 1.065,
+          "n": 13
+        },
+        "winner_disagree": 0
+      },
+      "eth 15m": {
+        "closes": 6,
+        "div_spot_bps": {
+          "p10": 4.492,
+          "p50": 4.89,
+          "p90": 5.506,
+          "n": 6
+        },
+        "div_twap_bps": {
+          "p10": 4.478,
+          "p50": 4.73,
+          "p90": 5.271,
+          "n": 6
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.033,
+          "p50": 0.073,
+          "p90": 0.22,
+          "n": 6
+        },
+        "abs_move_bps": {
+          "p10": 8.906,
+          "p50": 13.905,
+          "p90": 26.958,
+          "n": 5
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.21,
+          "p50": 0.299,
+          "p90": 0.34,
+          "n": 5
+        },
+        "winner_disagree": 0
+      },
+      "eth 4h": {
+        "closes": 1,
+        "div_spot_bps": {
+          "p10": 5.61,
+          "p50": 5.61,
+          "p90": 5.61,
+          "n": 1
+        },
+        "div_twap_bps": {
+          "p10": 5.447,
+          "p50": 5.447,
+          "p90": 5.447,
+          "n": 1
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.017,
+          "p50": 0.017,
+          "p90": 0.017,
+          "n": 1
+        },
+        "abs_move_bps": null,
+        "anchored_binance_proxy_abs_err_bps": null,
+        "winner_disagree": 0
+      },
+      "eth 5m": {
+        "closes": 16,
+        "div_spot_bps": {
+          "p10": 4.397,
+          "p50": 4.798,
+          "p90": 5.604,
+          "n": 15
+        },
+        "div_twap_bps": {
+          "p10": 4.477,
+          "p50": 4.843,
+          "p90": 5.35,
+          "n": 15
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.056,
+          "p50": 0.165,
+          "p90": 0.464,
+          "n": 15
+        },
+        "abs_move_bps": {
+          "p10": 2.448,
+          "p50": 5.267,
+          "p90": 15.922,
+          "n": 13
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.117,
+          "p50": 0.313,
+          "p90": 0.829,
+          "n": 13
+        },
+        "winner_disagree": 0
+      },
+      "sol 15m": {
+        "closes": 6,
+        "div_spot_bps": {
+          "p10": 4.229,
+          "p50": 4.891,
+          "p90": 6.44,
+          "n": 6
+        },
+        "div_twap_bps": {
+          "p10": 4.518,
+          "p50": 4.851,
+          "p90": 5.667,
+          "n": 6
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.116,
+          "p50": 0.191,
+          "p90": 0.331,
+          "n": 6
+        },
+        "abs_move_bps": {
+          "p10": 12.523,
+          "p50": 25.134,
+          "p90": 52.557,
+          "n": 5
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.314,
+          "p50": 0.586,
+          "p90": 0.656,
+          "n": 5
+        },
+        "winner_disagree": 0
+      },
+      "sol 4h": {
+        "closes": 1,
+        "div_spot_bps": {
+          "p10": 6.555,
+          "p50": 6.555,
+          "p90": 6.555,
+          "n": 1
+        },
+        "div_twap_bps": {
+          "p10": 6.0,
+          "p50": 6.0,
+          "p90": 6.0,
+          "n": 1
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.441,
+          "p50": 0.441,
+          "p90": 0.441,
+          "n": 1
+        },
+        "abs_move_bps": null,
+        "anchored_binance_proxy_abs_err_bps": null,
+        "winner_disagree": 0
+      },
+      "sol 5m": {
+        "closes": 16,
+        "div_spot_bps": {
+          "p10": 4.207,
+          "p50": 4.781,
+          "p90": 6.027,
+          "n": 15
+        },
+        "div_twap_bps": {
+          "p10": 4.437,
+          "p50": 4.932,
+          "p90": 5.37,
+          "n": 15
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.083,
+          "p50": 0.222,
+          "p90": 0.427,
+          "n": 15
+        },
+        "abs_move_bps": {
+          "p10": 3.39,
+          "p50": 9.551,
+          "p90": 23.432,
+          "n": 13
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.055,
+          "p50": 0.277,
+          "p90": 0.896,
+          "n": 13
+        },
+        "winner_disagree": 0
+      },
+      "xrp 15m": {
+        "closes": 6,
+        "div_spot_bps": {
+          "p10": 4.176,
+          "p50": 4.822,
+          "p90": 5.806,
+          "n": 6
+        },
+        "div_twap_bps": {
+          "p10": 4.109,
+          "p50": 4.549,
+          "p90": 5.416,
+          "n": 6
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.077,
+          "p50": 0.265,
+          "p90": 0.331,
+          "n": 6
+        },
+        "abs_move_bps": {
+          "p10": 12.053,
+          "p50": 19.18,
+          "p90": 42.913,
+          "n": 5
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.305,
+          "p50": 0.472,
+          "p90": 0.608,
+          "n": 5
+        },
+        "winner_disagree": 0
+      },
+      "xrp 4h": {
+        "closes": 1,
+        "div_spot_bps": {
+          "p10": 5.826,
+          "p50": 5.826,
+          "p90": 5.826,
+          "n": 1
+        },
+        "div_twap_bps": {
+          "p10": 5.7,
+          "p50": 5.7,
+          "p90": 5.7,
+          "n": 1
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.267,
+          "p50": 0.267,
+          "p90": 0.267,
+          "n": 1
+        },
+        "abs_move_bps": null,
+        "anchored_binance_proxy_abs_err_bps": null,
+        "winner_disagree": 0
+      },
+      "xrp 5m": {
+        "closes": 16,
+        "div_spot_bps": {
+          "p10": 4.222,
+          "p50": 4.811,
+          "p90": 5.697,
+          "n": 15
+        },
+        "div_twap_bps": {
+          "p10": 4.092,
+          "p50": 4.603,
+          "p90": 5.394,
+          "n": 15
+        },
+        "div_twap_minus_basis_abs_bps": {
+          "p10": 0.047,
+          "p50": 0.267,
+          "p90": 0.403,
+          "n": 15
+        },
+        "abs_move_bps": {
+          "p10": 3.365,
+          "p50": 9.965,
+          "p90": 21.245,
+          "n": 13
+        },
+        "anchored_binance_proxy_abs_err_bps": {
+          "p10": 0.047,
+          "p50": 0.507,
+          "p90": 0.791,
+          "n": 13
+        },
+        "winner_disagree": 0
+      }
+    },
+    "winner_disagree_total": 0,
+    "rtds_twap_vs_official_final_bps": {
+      "p10": 0.0,
+      "p50": 0.0,
+      "p90": 0.0,
+      "n": 126
+    },
+    "rtds_winner_matches_official": 1.0,
+    "binance_winner_matches_official": 1.0
+  },
+  "spot_coverage": {
+    "binance:spot:bnb": {
+      "seconds": 2586,
+      "share_of_span": 0.538,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "binance:spot:btc": {
+      "seconds": 4258,
+      "share_of_span": 0.886,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "binance:spot:doge": {
+      "seconds": 2961,
+      "share_of_span": 0.616,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "binance:spot:eth": {
+      "seconds": 3053,
+      "share_of_span": 0.635,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "binance:spot:sol": {
+      "seconds": 2749,
+      "share_of_span": 0.572,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "binance:spot:xrp": {
+      "seconds": 2620,
+      "share_of_span": 0.545,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:spot:bnb": {
+      "seconds": 4465,
+      "share_of_span": 0.928,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:spot:btc": {
+      "seconds": 4467,
+      "share_of_span": 0.929,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:spot:doge": {
+      "seconds": 4469,
+      "share_of_span": 0.929,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:spot:eth": {
+      "seconds": 4465,
+      "share_of_span": 0.928,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:spot:sol": {
+      "seconds": 4462,
+      "share_of_span": 0.928,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:spot:xrp": {
+      "seconds": 4463,
+      "share_of_span": 0.928,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:twap60:bnb": {
+      "seconds": 4465,
+      "share_of_span": 0.928,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:twap60:btc": {
+      "seconds": 4468,
+      "share_of_span": 0.929,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:twap60:doge": {
+      "seconds": 4466,
+      "share_of_span": 0.929,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:twap60:eth": {
+      "seconds": 4465,
+      "share_of_span": 0.928,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:twap60:sol": {
+      "seconds": 4469,
+      "share_of_span": 0.929,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    },
+    "chainlink:twap60:xrp": {
+      "seconds": 4466,
+      "share_of_span": 0.929,
+      "from": "2026-10-01 18:40",
+      "to": "2026-10-01 20:00"
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+ "_request": "offset/limit cap probes",
+ "_fetched_at": "2026-09-28T18:30Z",
+ "response": {
+  "/activity?user=<U>&limit=500&offset=5001": {
+   "http": 400,
+   "body": {
+    "error": "max historical activity offset of 5000 exceeded"
+   }
+  },
+  "/trades?user=<U>&takerOnly=false&limit=500&offset=10001": {
+   "http": 400,
+   "body": {
+    "error": "max historical trades offset of 10000 exceeded"
+   }
+  },
+  "/v2/activity?user=<U>&limit=1001": {
+   "http": 400,
+   "body": {
+    "error": "Failed to deserialize query string: limit: limit must be between 0 and 1000",
+    "code": "invalid_request",
+    "retryable": false,
+    "trace_id": "72fce274be1542c181c7df5df4d881e4"
+   }
+  }
+ }
+}

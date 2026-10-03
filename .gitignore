@@ -1,0 +1,22 @@
+# local data and logs
+data/
+logs/
+*.db
+*.db-wal
+*.db-shm
+
+# environment
+.env
+.venv/
+venv/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# start-paper: the updown folder chosen on this machine
+.updown_path

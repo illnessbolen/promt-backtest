@@ -1,0 +1,42 @@
+{
+ "_request": "GET /v2/user-stats?user=0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+ "_fetched_at": "2026-09-28T18:30Z",
+ "response": {
+  "data": {
+   "proxy_wallet": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+   "trades": 89590,
+   "biggest_win": 1948.71548,
+   "views": 14971,
+   "join_date": 1779380273,
+   "all_time_pnl": {
+    "timestamp": 1790617389,
+    "source_block": 94608166,
+    "realized_market_pnl": 312523.832012,
+    "realized_lp_pnl": 0.0,
+    "realized_combo_pnl": 0.0,
+    "unrealized_pnl": -59.730668,
+    "fees_refunded": 0.0,
+    "maker_rebate": 34238.9927,
+    "taker_rebate": 4521.8616,
+    "reward_income": 4541.0429,
+    "yield_income": 0.0,
+    "referral_income": 0.0,
+    "deposits": null,
+    "withdrawals": null,
+    "realized_pnl": 312523.832012,
+    "wallet_income": 43301.8972,
+    "position_pnl": 312464.101344,
+    "settled_pnl": 355825.729212,
+    "economic_pnl": 355765.998544,
+    "trade_pnl": 348746.217514,
+    "sponsored_income": 4541.0429,
+    "fees": -36282.11617,
+    "fees_paid": -36282.11617,
+    "cashflow_net": null,
+    "volume": 20686657.134054,
+    "volume_usdc": 10399913.391666,
+    "trade_count": 540004
+   }
+  }
+ }
+}
