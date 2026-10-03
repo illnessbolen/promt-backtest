@@ -144,8 +144,9 @@ runs in three places:
 - **updown recordings** (`updown.py`, `updown-replay`): updown's own replay clock, hub, L2 books and paper exchange
   (subclassed so that quotes rest and bids fill from the other outcome's buyers). The strike of a TWAP-settled
   window is the Chainlink TWAP over the minute before the open, computed from the recorded ticks (0.08 bps from the
-  official one in median); updown's own reference takes the tick at the open (2.1 bps off in median, up to 13). updown is imported
-  from a checkout (`updown.path` in `config.yaml` or `UPDOWN_PATH`) and is not modified. Record with updown:
+  official one in median); updown's own reference took the tick at the open (2.1 bps off in median, up to 13)
+  until its branch `claude/twap-strike`. updown is imported from a checkout (`updown.path` in `config.yaml` or
+  `UPDOWN_PATH`); the adapter does not patch it. Record with updown:
   `python -m latarb shadow --record` (or `updown-paper --record` here), then point `updown-replay` at the tick files.
 - **Grid on recordings** (`updown_grid.py`, `updown-grid`): every grid point is a strategy host fed by the same
   replay, so a worker process parses the recording once for all its points (`--workers` processes share the points).

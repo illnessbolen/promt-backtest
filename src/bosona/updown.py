@@ -234,7 +234,8 @@ class StrategyHost:
         TWAP-settled windows (since 2026-08-07) the oracle's TWAP over the lookback before the open, from the
         recorded Chainlink ticks (previous tick each second): on the stage 5 recording it is 0.08 bps from the
         official strike (median; max 0.45), while the oracle tick at the open, which updown's ReferenceResolver
-        takes, is 2.1 bps off (median; max 13.4). Spot-settled windows keep updown's reference."""
+        took before its fix (branch claude/twap-strike, same rule), is 2.1 bps off (median; max 13.4). Computed here
+        too, so that any updown version gives the same strike. Spot-settled windows keep updown's reference."""
         if c.strike is not None:
             return c.strike
         w = c.w
