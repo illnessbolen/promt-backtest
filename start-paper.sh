@@ -2,9 +2,11 @@
 # Запуск стратегии @bosona внутри updown в paper-режиме (реальных ордеров нет) одной командой:
 #   ./start-paper.sh            -> меню
 #   ./start-paper.sh paper      -> сразу paper с записью тиков
+#   ./start-paper.sh where      -> показать, какая папка updown используется
 #   ./start-paper.sh <команда>  -> любая команда `python -m bosona`, например: updown-grid data/paper/ticks
-# При первом запуске создаёт .venv и ставит зависимости. Папку updown ищет рядом с этой
-# (updown, updown-*, illnessbolen/updown) или берёт из переменной UPDOWN_PATH.
+# При первом запуске создаёт .venv и ставит зависимости. Папка updown: переменная UPDOWN_PATH, запомненная
+# в .updown_path, поиск рядом с этой папкой и в ~/Downloads; иначе скрипт спросит путь (папку можно
+# перетащить в окно терминала).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -22,6 +24,40 @@ if [ -z "$PY" ]; then
   exit 1
 fi
 
+UD=""
+probe() {   # папка $1 или папка updown* прямо в ней (распаковка ZIP часто даёт папку в папке)
+  [ -n "$UD" ] && return 0
+  if [ -f "$1/latarb/__init__.py" ]; then UD="$(cd "$1" && pwd)"; return 0; fi
+  for e in "$1"/updown*; do
+    if [ -f "$e/latarb/__init__.py" ]; then UD="$(cd "$e" && pwd)"; return 0; fi
+  done
+  return 0
+}
+if [ -n "${UPDOWN_PATH:-}" ]; then probe "$UPDOWN_PATH"; fi
+if [ -z "$UD" ] && [ -f .updown_path ]; then probe "$(head -n 1 .updown_path)"; fi
+if [ -z "$UD" ]; then
+  for d in ./updown* ../updown* ../../updown* ../illnessbolen/updown "$HOME"/Downloads/updown*; do
+    probe "$d"
+  done
+  while [ -z "$UD" ]; do
+    echo
+    echo "Не нашёл папку updown. Перетащите папку updown (в ней bot.py и папка latarb) в это окно и нажмите Enter."
+    read -r -p "Папка updown: " answer || exit 1
+    answer="$(printf '%s' "$answer" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e "s/^[\"']//" -e "s/[\"']\$//")"
+    answer="${answer//\\ / }"          # терминал macOS экранирует пробелы в перетащенном пути
+    if [ -z "$answer" ]; then
+      echo "Папка не указана. Скачайте updown (github.com/illnessbolen/updown), распакуйте и запустите снова." >&2
+      exit 1
+    fi
+    probe "$answer"
+    if [ -z "$UD" ]; then echo "В «$answer» нет папки latarb — это не папка updown, попробуйте ещё раз."; fi
+  done
+  printf '%s\n' "$UD" > .updown_path
+fi
+export UPDOWN_PATH="$UD"
+echo "[setup] updown: $UPDOWN_PATH"
+if [ "${1:-}" = "where" ]; then exit 0; fi
+
 if [ ! -x .venv/bin/python ]; then
   echo "[setup] создаю виртуальное окружение .venv ($("$PY" --version))"
   if ! "$PY" -m venv .venv; then
@@ -38,22 +74,6 @@ if [ ! -f .venv/.installed ] || [ pyproject.toml -nt .venv/.installed ]; then
   "$VPY" -m pip install -e ".[updown]"
   touch .venv/.installed
 fi
-
-if [ -z "${UPDOWN_PATH:-}" ] || [ ! -f "$UPDOWN_PATH/latarb/__init__.py" ]; then
-  UPDOWN_PATH=""
-  for d in ../updown ../updown-* ../illnessbolen/updown; do
-    if [ -f "$d/latarb/__init__.py" ]; then
-      UPDOWN_PATH="$(cd "$d" && pwd)"; break
-    fi
-  done
-fi
-if [ -z "$UPDOWN_PATH" ]; then
-  echo "Не нашёл папку updown. Скачайте updown (github.com/illnessbolen/updown) и положите её рядом" >&2
-  echo "с этой папкой, например ../updown, или укажите путь: UPDOWN_PATH=/путь/к/updown ./start-paper.sh" >&2
-  exit 1
-fi
-export UPDOWN_PATH
-echo "[setup] updown: $UPDOWN_PATH"
 
 if [ $# -eq 0 ]; then
   cat <<'MENU'

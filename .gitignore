@@ -17,3 +17,6 @@ __pycache__/
 .pytest_cache/
 build/
 dist/
+
+# start-paper: the updown folder chosen on this machine
+.updown_path
