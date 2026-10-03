@@ -22,6 +22,17 @@ python3.11 -m venv .venv
 cp .env.example .env        # optional, only for overrides; no secrets are needed
 ```
 
+## Paper trading in one click (stage 5)
+
+1. Install Python 3.11 or newer (python.org; on Windows tick "Add python.exe to PATH").
+2. Put this folder and an updown checkout side by side, e.g. `bots/promt-backtest` and `bots/updown`
+   (a GitHub ZIP folder such as `updown-main` is found too; or set `UPDOWN_PATH`).
+3. Run `start-paper.bat` (Windows: double-click) or `bash start-paper.sh` (macOS / Linux) and pick:
+   `1` check (5 minutes), `2` paper trading with tick recording until stopped, `3` compare rule settings on the
+   recording (`updown-grid`), `4` tests. The first run creates `.venv` and installs the dependencies.
+
+No real order can be sent. Pause quoting: create a file named `STOP` in this folder; delete it to resume.
+
 ## Commands
 
 ```bash
