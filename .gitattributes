@@ -1,0 +1,3 @@
+# .bat files are stored with CRLF as is, so a raw download works in cmd too (label lookup)
+*.bat -text
+*.sh text eol=lf

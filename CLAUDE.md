@@ -6,7 +6,7 @@
 
 ## Текущий статус
 
-Текущий этап: **0 — разведка**
+Текущий этап: **все этапы 0–5 завершены** (этап 5 принят 2026-10-02, отчёт: `docs/stage5-backtest.md`; этап 4: `docs/stage4-strategy.md`; этап 3: `docs/stage3-live.md`; этап 2: `docs/stage2-context.md`; этап 1: `docs/stage1-history.md`; этап 0: `docs/stage0-recon.md`). Предложенные следующие шаги — в разделе «Что дальше» отчёта этапа 5.
 (обновляй эту строку после того, как я подтверждаю завершение этапа)
 
 ## Объект
@@ -28,6 +28,75 @@
 - Только публичные источники: Data API (`data-api.polymarket.com`), Gamma API (`gamma-api.polymarket.com`), публичная часть CLOB API (`clob.polymarket.com`), Binance public REST/WebSocket, при необходимости публичный Polygon RPC.
 - Не выдумывай эндпоинты и поля. Перед написанием кода делай тестовые запросы, показывай реальные примеры ответов и сверяйся с docs.polymarket.com.
 - Соблюдай rate limits: backoff, кеширование, умеренный параллелизм.
+
+## Открытые вопросы
+
+### 1. Источник живых цен Chainlink для этапа 3 — ✅ решено 2026-09-29
+
+Рынки 5m/15m/4h резолвятся по Chainlink. С 2026-08-07 это TWAP за 60 с; у 5m до 2026-08-14 было 30 с. До 2026-08-07 резолв шёл по спот-цене Chainlink (`docs/stage0-recon.md` §4).
+Для live-трекера нужна та же цена в реальном времени.
+
+**Решение (требования к этапу 3):**
+
+- Ключи из кошелька не используем, ограничение «только чтение» в силе. PolyBolt не подходит.
+- **Binance** (`data-stream.binance.vision`) пишем всегда: это базовый источник спота.
+- **Chainlink** берём из публичного RTDS (`crypto_prices_chainlink` на `wss://ws-live-data.polymarket.com`), пока поток работает.
+  Если поток отвалится или его удалят, трекер продолжает работать на Binance и не падает.
+- **Источник цены — подключаемый модуль** (единый интерфейс провайдера).
+  Позже возможно подключение Chainlink Data Streams по ключу из `.env`: оно должно включаться без переделки кода.
+- В **каждой записи хранится источник цены**.
+  Пока доступны оба источника, логируем расхождение Binance и Chainlink, особенно около закрытия окна, чтобы понять, насколько оно важно.
+- Сетевой доступ к `ws-live-data.polymarket.com`, `ws-subscriptions-clob.polymarket.com` и `data-stream.binance.vision` пользователь открывает до этапа 3.
+
+Справка: в том же RTDS есть `crypto_prices_twap_sixty` — это TWAP 60 с, по нему резолвятся рынки. Имеет смысл писать и его; решим на этапе 3.
+
+**Статус (этап 3, 2026-10-01):** реализовано в `bosona/live/prices.py`, подробно — `docs/stage3-live.md`.
+
+- Провайдеры: `binance_ws` (всегда), `chainlink_rtds` (спот и `crypto_prices_twap_sixty`), `chainlink_data_streams` (включается сам, когда в `.env` есть ключи).
+- TWAP-60 из RTDS на старте и конце окна совпал с официальными `priceToBeat`/`finalPrice` до последнего знака (126 из 126 закрытий; strike — 114 из 114).
+- Для Data Streams, кроме ключей, понадобится:
+  - доступ к хостам `api.dataengine.chain.link` / `ws.dataengine.chain.link` (из контейнера сейчас 403);
+  - feed id TWAP-стримов (`btc-usd-twap-60s-streams` и т.п.) — их можно взять на data.chain.link.
+
+Ниже — исходные данные, на которых принималось решение.
+
+**Откуда известно, что публичный `crypto_prices_chainlink` в RTDS удалят** (проверено 2026-09-29):
+
+- [Predictions Changelog](https://docs.polymarket.com/changelog/predictions), запись **2026-09-15** «PolyBolt WebSocket». Цитата: «RTDS is legacy for reference prices: `crypto_prices`, `crypto_prices_chainlink` and `equity_prices` map to the new channels».
+- [Migrating from RTDS](https://docs.polymarket.com/migrate/rtds-to-polybolt). Цитата: «Deprecated RTDS price topics are planned for removal one month after the `0.11.0` release».
+- [SDK Changelog](https://docs.polymarket.com/changelog/sdks): у версии 0.11.0 та же формулировка, но без даты.
+  По реестрам 0.11.0 опубликован **2026-09-23**: PyPI `polymarket-client` в 13:20 UTC, npm `@polymarket/client` в 13:25 UTC.
+  Значит, удаление ожидается **около 2026-10-23**. Точной даты в документации нет.
+
+**Рассмотренные варианты:**
+
+| Вариант | Что даёт | Что нужно для доступа | Совместим с «только чтение, без ключей» |
+|---|---|---|---|
+| RTDS legacy `wss://ws-live-data.polymarket.com`, топики `crypto_prices_chainlink`, `crypto_prices_twap_sixty`, `crypto_prices_twap_thirty` | Chainlink спот и TWAP в реальном времени | без авторизации; хост в allowlist окружения | да, но только до удаления (~2026-10-23) |
+| PolyBolt `wss://ws-live-v2.polymarket.com/ws`, канал `price.crypto.twap` ([обзор](https://docs.polymarket.com/api-reference/live-data/overview)) | Chainlink TWAP 60 с + снапшот за 2 мин; `price.crypto` берётся из Pyth, а не Chainlink; 30-секундного TWAP нет | CLOB API credentials (apiKey/secret/passphrase). Их создают L1-подписью EIP-712 приватным ключом кошелька ([Authentication](https://docs.polymarket.com/getting-started/api)) | **нет**, нужен ключ кошелька |
+| Chainlink Data Streams напрямую (REST/WebSocket) | отчёты Chainlink, в том числе исторические по timestamp | API key + user secret, которые Chainlink выдаёт при подключении к Data Streams; запросы подписываются HMAC ([Authentication](https://docs.chain.link/data-streams/reference/data-streams-api/authentication)) | ключ не кошельковый, но источник не публичный; нужно твоё решение |
+| Прокси без ключей: Coinbase `BTC-USD` или Binance 1s с поправкой на базис, TWAP считаем сами; сверка по Gamma `priceToBeat`/`finalPrice` | оценка цены Chainlink | ничего, всё публичное | да; точность на границах окон σ ≈ 0.5–0.7 bps (замер этапа 0) |
+
+### 2. Исторические цены Chainlink для этапа 2 (проверено 2026-09-29, до конца этапа 1)
+
+| Что нужно | Есть ли без ключей | Источник |
+|---|---|---|
+| strike и итог окна 5m/15m/4h | **да** | Gamma `eventMetadata.priceToBeat` / `finalPrice`, покрытие 96–100% окон; пропуски восполняются цепочкой `priceToBeat(N) = finalPrice(N−1)` |
+| strike и итог окна 1h/daily | **да, точно** | свечи Binance (open/close 1h, close 1m в 12:00 ET): совпадают с Gamma до цента |
+| **цена Chainlink в момент каждой сделки внутри окна** | **нет** | точных исторических значений без ключей не найти |
+
+Почему третьей строки нет без ключей:
+
+- On-chain резолв не содержит цен. Резолв идёт через ERC-4337 `handleOps` → `execute` → оракул `0x58e1745bedda7312c4cddb72618923da1b90efde` (selector `0xc49298ac`), а аргументы — только `questionId` и выплаты `[1, 0]`. Проверено на резолве `btc-updown-15m-1790616600` (tx `0xe4caad6f…7c6f`).
+- История отчётов Chainlink Data Streams доступна только через их REST API с API key + user secret.
+- PolyBolt даёт только живой поток и снапшот за 2 мин, и нужны CLOB-ключи. RTDS даёт только живой поток.
+
+**Предлагаемая замена для этапа 2** (без ключей): прокси-цена Coinbase `BTC-USD` или Binance 1s с поправкой базиса, откалиброванной по `priceToBeat`/`finalPrice` соседних окон. TWAP считаем по прокси.
+Ожидаемая ошибка ~0.5–0.7 bps (σ на границах окон, этап 0). Если нужна точная история, требуется решение по Chainlink Data Streams (вопрос 1).
+
+**Статус:** на этапе 2 реализован прокси Binance 1s, привязанный к официальному strike каждого окна.
+Ошибка к концу окна: медиана 0.3–0.9 bps. Подробно — `docs/stage2-context.md`.
+Если позже появится ключ Chainlink Data Streams, историю можно будет уточнить.
 
 ## Этапы
 
@@ -84,3 +153,26 @@
 ## Команды
 
 (заполни по мере появления: установка, выгрузка истории, запуск трекера, отчёт, бэктест)
+
+```bash
+python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'   # установка
+.venv/bin/python -m bosona sync            # выгрузка истории + метаданные рынков (идемпотентно, докачивает новое)
+.venv/bin/python -m bosona sync --full     # перечитать всю историю заново (дубликатов не будет)
+.venv/bin/python -m bosona verify          # сверка с /v2/user-stats, /v2/user-volume, /v2/user-pnl
+.venv/bin/python -m bosona stats           # размеры таблиц
+.venv/bin/pytest                           # тесты парсинга, дедупликации и контекста
+.venv/bin/python -m bosona stage2          # этап 2: 1s-цены Binance + история цен токенов + контекст сделок
+.venv/bin/python -m bosona validate        # этап 2: покрытие, точность прокси, сверка PnL
+.venv/bin/python -m bosona track           # этап 3: live-трекер (Ctrl+C/SIGTERM — штатная остановка), data/live.db, logs/live.log
+.venv/bin/python -m bosona live-report     # этап 3: задержки по каналам, сдвиг цены, цена копирования, Binance vs Chainlink
+.venv/bin/python -m bosona sample-orders   # этап 4: размеры и лимит-цены его ордеров из calldata (выборка 1 200 tx за 30 дней)
+.venv/bin/python -m bosona stage4          # этап 4: все таблицы разбора -> docs/stage4-data.md, docs/stage4/segments.csv
+.venv/bin/python -m bosona sync-tape       # этап 5: ленты сделок 3 000 случайных окон BTC 5m + 800 15m -> data/tape.db (докачивает)
+.venv/bin/python -m bosona backtest        # этап 5: сравнение (a)/(b)/(c) на ленте -> docs/stage5-data.md (~2 мин)
+.venv/bin/python -m bosona backtest --variants c_rules --queue touch --param margin=0.05   # точка сетки правил -> data/backtest/
+.venv/bin/python -m bosona updown-replay data/updown/ticks   # этап 5: правила на записях updown (настоящий L2)
+.venv/bin/python -m bosona updown-paper --profile conservative   # этап 5: paper (DRY_RUN) на живых данных updown
+.venv/bin/python -m bosona updown-paper --record    # то же + запись тиков в data/paper/ticks
+.venv/bin/python -m bosona updown-grid data/paper/ticks   # сетка правил на записи -> data/backtest/updown-grid.md
+./start-paper.sh                           # то же в один клик (Windows: start-paper.bat): проверка, paper с записью, сетка, тесты
+```

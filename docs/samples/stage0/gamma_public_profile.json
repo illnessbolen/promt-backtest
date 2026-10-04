@@ -1,0 +1,24 @@
+{
+ "_request": "GET https://gamma-api.polymarket.com/public-profile?address=0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+ "_fetched_at": "2026-09-28T18:10Z",
+ "response": {
+  "$schema": "https://gamma-api.polymarket.com/schemas/PublicProfileResponse.json",
+  "createdAt": "2026-05-21T16:17:53.067277Z",
+  "proxyWallet": "0xc2ad03f79ca3f3c17d8c7de2612ce0c89b7d40ed",
+  "displayUsernamePublic": true,
+  "pseudonym": "Impolite-Sister",
+  "name": "bosona",
+  "users": [
+   {
+    "id": "8245652",
+    "creator": false,
+    "mod": false,
+    "communityMod": false
+   }
+  ],
+  "verifiedBadge": false,
+  "takerTier": 3,
+  "takerTierName": "Gold",
+  "weightedVolume": 493229.457498
+ }
+}

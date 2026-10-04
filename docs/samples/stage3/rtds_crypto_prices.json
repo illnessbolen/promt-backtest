@@ -1,0 +1,218 @@
+{
+ "_request": "wss://ws-live-data.polymarket.com",
+ "_fetched_at": "2026-10-01T18:04Z",
+ "subscribe_frame": {
+  "action": "subscribe",
+  "subscriptions": [
+   {
+    "topic": "crypto_prices_chainlink",
+    "type": "update"
+   },
+   {
+    "topic": "crypto_prices_twap_sixty",
+    "type": "update"
+   },
+   {
+    "topic": "crypto_prices_twap_thirty",
+    "type": "update"
+   },
+   {
+    "topic": "crypto_prices",
+    "type": "update"
+   }
+  ]
+ },
+ "_note": "heartbeat: text 'PING' every 5 s. 60 s capture. recv_minus_payload_ts_ms = local receive - payload.timestamp; Chainlink/TWAP payload timestamps are whole seconds and arrive ~1.4 s later. full_accuracy_value: E18 integer for chainlink/twap topics, decimal string for crypto_prices (Binance).",
+ "counts_60s": {
+  "crypto_prices:update": 348,
+  "crypto_prices_chainlink:update": 464,
+  "crypto_prices_twap_thirty:update": 463,
+  "crypto_prices_twap_thirty:btc/usd": 58,
+  "crypto_prices_chainlink:btc/usd": 58,
+  "crypto_prices:btcusdt": 58,
+  "crypto_prices_twap_sixty:update": 464,
+  "crypto_prices_twap_sixty:btc/usd": 58
+ },
+ "recv_minus_payload_ts_ms": {
+  "crypto_prices": {
+   "n": 348,
+   "p10": 260.802001953125,
+   "p50": 440.283447265625,
+   "p90": 571.1123046875
+  },
+  "crypto_prices_chainlink": {
+   "n": 464,
+   "p10": 1121.37548828125,
+   "p50": 1439.34619140625,
+   "p90": 1762.029052734375
+  },
+  "crypto_prices_twap_thirty": {
+   "n": 463,
+   "p10": 1164.80224609375,
+   "p50": 1459.7109375,
+   "p90": 1778.568359375
+  },
+  "crypto_prices_twap_sixty": {
+   "n": 464,
+   "p10": 1190.3564453125,
+   "p50": 1506.313720703125,
+   "p90": 1855.15185546875
+  }
+ },
+ "update_gaps_btc": {
+  "crypto_prices_twap_thirty:btc/usd": {
+   "n": 58,
+   "gap_ms_p50": 1000,
+   "gap_ms_max": 1000
+  },
+  "crypto_prices_chainlink:btc/usd": {
+   "n": 58,
+   "gap_ms_p50": 1000,
+   "gap_ms_max": 1000
+  },
+  "crypto_prices:btcusdt": {
+   "n": 58,
+   "gap_ms_p50": 1000,
+   "gap_ms_max": 1000
+  },
+  "crypto_prices_twap_sixty:btc/usd": {
+   "n": 58,
+   "gap_ms_p50": 1000,
+   "gap_ms_max": 1000
+  }
+ },
+ "samples": {
+  "crypto_prices:update": [
+   {
+    "recv_ms": 1790877851242.0562,
+    "msg": {
+     "connection_id": "gcMhgK7UIWeIKEjY6A==",
+     "payload": {
+      "full_accuracy_value": "1.49890000",
+      "symbol": "xrpusdt",
+      "timestamp": 1790877851000,
+      "value": 1.4989
+     },
+     "timestamp": 1790877851136,
+     "topic": "crypto_prices",
+     "type": "update"
+    }
+   },
+   {
+    "recv_ms": 1790877851257.6794,
+    "msg": {
+     "connection_id": "gcMhgK7UIWeIKEjY6A==",
+     "payload": {
+      "full_accuracy_value": "771.22000000",
+      "symbol": "bnbusdt",
+      "timestamp": 1790877851000,
+      "value": 771.22
+     },
+     "timestamp": 1790877851122,
+     "topic": "crypto_prices",
+     "type": "update"
+    }
+   }
+  ],
+  "crypto_prices_chainlink:update": [
+   {
+    "recv_ms": 1790877851272.6978,
+    "msg": {
+     "connection_id": "gcMhgK7UIWeIKEjY6A==",
+     "payload": {
+      "full_accuracy_value": "87459144230786980000",
+      "symbol": "hype/usd",
+      "timestamp": 1790877850000,
+      "value": 87.45914423078698
+     },
+     "timestamp": 1790877851082,
+     "topic": "crypto_prices_chainlink",
+     "type": "update"
+    }
+   },
+   {
+    "recv_ms": 1790877851314.4717,
+    "msg": {
+     "connection_id": "gcMhgK7UIWeIKEjY6A==",
+     "payload": {
+      "full_accuracy_value": "118181903510394990000",
+      "symbol": "sol/usd",
+      "timestamp": 1790877850000,
+      "value": 118.18190351039499
+     },
+     "timestamp": 1790877851098,
+     "topic": "crypto_prices_chainlink",
+     "type": "update"
+    }
+   }
+  ],
+  "crypto_prices_twap_thirty:update": [
+   {
+    "recv_ms": 1790877851306.4802,
+    "msg": {
+     "connection_id": "gcMhgK7UIWeIKEjY6A==",
+     "payload": {
+      "full_accuracy_value": "770995366312083849216",
+      "symbol": "bnb/usd",
+      "timestamp": 1790877850000,
+      "value": 770.9953663120839,
+      "window_s": 30
+     },
+     "timestamp": 1790877851194,
+     "topic": "crypto_prices_twap_thirty",
+     "type": "update"
+    }
+   },
+   {
+    "recv_ms": 1790877851312.286,
+    "msg": {
+     "connection_id": "gcMhgK7UIWeIKEjY6A==",
+     "payload": {
+      "full_accuracy_value": "118190620379438628864",
+      "symbol": "sol/usd",
+      "timestamp": 1790877850000,
+      "value": 118.19062037943863,
+      "window_s": 30
+     },
+     "timestamp": 1790877851177,
+     "topic": "crypto_prices_twap_thirty",
+     "type": "update"
+    }
+   }
+  ],
+  "crypto_prices_twap_sixty:update": [
+   {
+    "recv_ms": 1790877851409.2295,
+    "msg": {
+     "connection_id": "gcMhgK7UIWeIKEjY6A==",
+     "payload": {
+      "full_accuracy_value": "2695888685950540709888",
+      "symbol": "eth/usd",
+      "timestamp": 1790877850000,
+      "value": 2695.8886859505405,
+      "window_s": 60
+     },
+     "timestamp": 1790877851173,
+     "topic": "crypto_prices_twap_sixty",
+     "type": "update"
+    }
+   },
+   {
+    "recv_ms": 1790877851419.9736,
+    "msg": {
+     "connection_id": "gcMhgK7UIWeIKEjY6A==",
+     "payload": {
+      "full_accuracy_value": "118220764308926824448",
+      "symbol": "sol/usd",
+      "timestamp": 1790877850000,
+      "value": 118.22076430892682,
+      "window_s": 60
+     },
+     "timestamp": 1790877851223,
+     "topic": "crypto_prices_twap_sixty",
+     "type": "update"
+    }
+   }
+  ]
+ }
+}

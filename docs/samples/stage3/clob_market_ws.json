@@ -1,0 +1,182 @@
+{
+ "_request": "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+ "_fetched_at": "2026-10-01T18:04Z",
+ "market": "btc-updown-5m-1790877600",
+ "condition_id": "0xa52f1552d5739ee1f1aeda03c88ed700e0800eaee26b6d6fdab9fc425d6b6e25",
+ "tokens": {
+  "Up": "12011180738199585495906106358594076885211968479491067303871379760861383877631",
+  "Down": "89435415234172173118754473157588029226460926450310014396990827057806580603933"
+ },
+ "subscribe_frame": {
+  "assets_ids": [
+   "12011180738199585495906106358594076885211968479491067303871379760861383877631",
+   "89435415234172173118754473157588029226460926450310014396990827057806580603933"
+  ],
+  "type": "market",
+  "custom_feature_enabled": true
+ },
+ "_note": "heartbeat: text 'PING' every 10 s (server answers 'PONG'). 60 s capture of one BTC 5m window: event counts below. recv_minus_ts_ms ~ 0: timestamps are server send times in ms. last_trade_price carries transaction_hash: the CLOB match time of a fill.",
+ "counts_60s": {
+  "book": 22,
+  "price_change": 3420,
+  "best_bid_ask": 20,
+  "last_trade_price": 10,
+  "PONG": 5,
+  "new_market": 2
+ },
+ "recv_minus_ts_ms": {
+  "book": {
+   "n": 22,
+   "p50": -1.19140625,
+   "p90": 4.619384765625
+  },
+  "price_change": {
+   "n": 3420,
+   "p50": -3.406494140625,
+   "p90": 6.632080078125
+  },
+  "best_bid_ask": {
+   "n": 20,
+   "p50": -3.294189453125,
+   "p90": 3.49755859375
+  },
+  "last_trade_price": {
+   "n": 10,
+   "p50": -1.919921875,
+   "p90": 11.4814453125
+  },
+  "new_market": {
+   "n": 2,
+   "p50": 114.748291015625,
+   "p90": 114.748291015625
+  }
+ },
+ "samples": {
+  "book": {
+   "market": "0xa52f1552d5739ee1f1aeda03c88ed700e0800eaee26b6d6fdab9fc425d6b6e25",
+   "asset_id": "12011180738199585495906106358594076885211968479491067303871379760861383877631",
+   "timestamp": "1790877850652",
+   "hash": "bc87a529d3abfff8cc2ed6b6a6caa3f371a24640",
+   "bids": [],
+   "asks": [
+    {
+     "price": "0.99",
+     "size": "2856.23"
+    },
+    {
+     "price": "0.98",
+     "size": "458.49"
+    },
+    {
+     "price": "0.97",
+     "size": "1672.12"
+    },
+    "... 93 more ...",
+    {
+     "price": "0.03",
+     "size": "2620"
+    },
+    {
+     "price": "0.02",
+     "size": "821.1"
+    },
+    {
+     "price": "0.01",
+     "size": "47509.38"
+    }
+   ],
+   "tick_size": "0.01",
+   "event_type": "book",
+   "last_trade_price": "0.990"
+  },
+  "price_change": {
+   "market": "0xa52f1552d5739ee1f1aeda03c88ed700e0800eaee26b6d6fdab9fc425d6b6e25",
+   "price_changes": [
+    {
+     "asset_id": "89435415234172173118754473157588029226460926450310014396990827057806580603933",
+     "price": "0.01",
+     "size": "2866.23",
+     "side": "BUY",
+     "hash": "a912cab3f31f10cd2afe589f9aa3b4901ba82afe",
+     "best_bid": "0.99",
+     "best_ask": "1"
+    },
+    {
+     "asset_id": "12011180738199585495906106358594076885211968479491067303871379760861383877631",
+     "price": "0.99",
+     "size": "2866.23",
+     "side": "SELL",
+     "hash": "e84b3a770801f6f8274f6522fab1ec98cb7b68d5",
+     "best_bid": "0",
+     "best_ask": "0.01"
+    }
+   ],
+   "timestamp": "1790877850658",
+   "event_type": "price_change"
+  },
+  "best_bid_ask": {
+   "market": "0xa52f1552d5739ee1f1aeda03c88ed700e0800eaee26b6d6fdab9fc425d6b6e25",
+   "asset_id": "12011180738199585495906106358594076885211968479491067303871379760861383877631",
+   "best_bid": "0",
+   "best_ask": "0.01",
+   "spread": "0.01",
+   "timestamp": "1790877852045",
+   "event_type": "best_bid_ask"
+  },
+  "last_trade_price": {
+   "market": "0xa52f1552d5739ee1f1aeda03c88ed700e0800eaee26b6d6fdab9fc425d6b6e25",
+   "asset_id": "12011180738199585495906106358594076885211968479491067303871379760861383877631",
+   "price": "0.01",
+   "size": "100",
+   "fee_rate_bps": "0",
+   "side": "BUY",
+   "timestamp": "1790877852069",
+   "event_type": "last_trade_price",
+   "transaction_hash": "0x0da1b3e202296b28a83f4392f55b65457e727c73819cc9adc11de360b6e58005"
+  },
+  "new_market": {
+   "id": "5184362",
+   "question": "Map 1 Total Rounds: Over/Under 18.5",
+   "market": "0x751f9084c40ba5db3f521f6960851f111a813d798a9d8f366b8ef4e2e07e79e2",
+   "slug": "cs2-9ine-mtx1-2026-10-02-game1-round-total-18pt5",
+   "description": "This market refers to the Counter-Strike match between 9INE and Matrix in the ROG Journey Group C, initially scheduled f...",
+   "assets_ids": [
+    "64576274604449910821580483270396903521340723524127823830269597978435530288028",
+    "64753770709594790151489899929116121724237495916517106518324143162827930710135"
+   ],
+   "outcomes": [
+    "Over",
+    "Under"
+   ],
+   "event_message": {
+    "id": "1114104",
+    "ticker": "cs2-9ine-mtx1-2026-10-02",
+    "slug": "cs2-9ine-mtx1-2026-10-02",
+    "title": "Counter-Strike: 9INE vs Matrix (BO1) - ROG Journey Group C",
+    "description": "This market refers to the Counter-Strike match between 9INE and Matrix in the ROG Journey Group C, initially scheduled for October 2, 2026 at 10:00 AM ET.\n\nThis market will resolve to \"9INE\" if 9INE win the match against Matrix.\n\nThis market will resolve to \"Matrix\" if Matrix win the match against 9INE.\n\nIf the match is canceled (not played at all) or ends in a tie, this market will resolve to 50-50.\n\nIf the match is postponed, it must be rescheduled to a start time on or before October 16, 2026 at 11:59 PM ET (14 calendar days after the originally scheduled start of October 2, 2026 at 10:00 AM ET). If, by that deadline, the most recently announced rescheduled start time is on or before the deadline, this market resolves based on the result of the match as played. Otherwise, this market resolves 50-50, regardless of whether the match is subsequently played.\n\nIf the match begins but is not completed, and one team wins due to the opponent's forfeiture, disqualification, or walkover, this market will resolve to the team who wins. \n\nIf the match ends in a forfeit, disqualification, or walkover (team withdraws before the start and the other wins automatically), this market will resolve to 50-50. \n\nThe resolution source for this market will be official information from https://hltv.org. However, if https://hltv.org has not published final results within 2 hours after the event\u2019s conclusion, a consensus of credible reporting may be used instead including video evidence.\n\nIn cases where a team\u2019s listed name includes minor discrepancies from the resolution source, this market will resolve based on the underlying real-world match rather than exact name matching. Recognizable abbreviations, alternate or erroneous spellings, sponsor tags, affiliate or academy designations, regional identifiers, and minor formatting differences will be treated as referring to the same team, provided the intended team can be clearly and uniquely identified within the relevant competition. If a listed team name has no reasonable connection to any participating team, or if it matches or could reasonably refer to another team in the same competition such that the intended team cannot be unambiguously determined, this market will resolve 50-50."
+   },
+   "timestamp": "1790877876888",
+   "event_type": "new_market",
+   "tags": [],
+   "condition_id": "0x751f9084c40ba5db3f521f6960851f111a813d798a9d8f366b8ef4e2e07e79e2",
+   "active": true,
+   "clob_token_ids": [
+    "64576274604449910821580483270396903521340723524127823830269597978435530288028",
+    "64753770709594790151489899929116121724237495916517106518324143162827930710135"
+   ],
+   "sports_market_type": "round_over_under_game_1",
+   "line": "18.5",
+   "game_start_time": "2026-10-02 14:00:00+00",
+   "order_price_min_tick_size": "0.01",
+   "group_item_title": "Map 1 Total Rounds: Over/Under 18.5",
+   "taker_base_fee": "1000",
+   "fees_enabled": true,
+   "fee_schedule": {
+    "exponent": "1",
+    "rate": "0.05",
+    "taker_only": true,
+    "rebate_rate": "0.15"
+   }
+  }
+ }
+}

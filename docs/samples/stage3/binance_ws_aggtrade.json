@@ -1,0 +1,122 @@
+{
+ "_request": "wss://data-stream.binance.vision/stream?streams=btcusdt@aggTrade/ethusdt@aggTrade/solusdt@aggTrade/xrpusdt@aggTrade/dogeusdt@aggTrade/bnbusdt@aggTrade/btcusdt@kline_1s/btcusdt@bookTicker",
+ "_fetched_at": "2026-10-01T18:04Z",
+ "_note": "60 s capture; recv_minus_event_ms = local receive time - Binance event time",
+ "msgs_per_s": {
+  "btcusdt@bookTicker": 105.86,
+  "xrpusdt@aggTrade": 1.25,
+  "btcusdt@aggTrade": 6.7,
+  "ethusdt@aggTrade": 6.06,
+  "btcusdt@kline_1s": 0.86,
+  "dogeusdt@aggTrade": 1.67,
+  "bnbusdt@aggTrade": 1.18,
+  "solusdt@aggTrade": 1.48
+ },
+ "recv_minus_event_ms": {
+  "aggTrade": {
+   "n": 1262,
+   "p50": 33.531005859375,
+   "p90": 40.05126953125
+  },
+  "aggTrade_T": {
+   "n": 1262,
+   "p50": 33.95458984375,
+   "p90": 40.63037109375
+  },
+  "kline_1s": {
+   "n": 59,
+   "p50": 34.316162109375,
+   "p90": 39.042724609375
+  }
+ },
+ "samples": {
+  "aggTrade": [
+   {
+    "recv_ms": 1790877850859.2732,
+    "msg": {
+     "stream": "xrpusdt@aggTrade",
+     "data": {
+      "e": "aggTrade",
+      "E": 1790877850787,
+      "s": "XRPUSDT",
+      "a": 727925158,
+      "p": "1.49890000",
+      "q": "331.90000000",
+      "f": 1729111269,
+      "l": 1729111274,
+      "T": 1790877850787,
+      "m": false,
+      "M": true
+     }
+    }
+   },
+   {
+    "recv_ms": 1790877850867.9846,
+    "msg": {
+     "stream": "btcusdt@aggTrade",
+     "data": {
+      "e": "aggTrade",
+      "E": 1790877850830,
+      "s": "BTCUSDT",
+      "a": 4078711150,
+      "p": "84740.58000000",
+      "q": "0.00097000",
+      "f": 6729028764,
+      "l": 6729028764,
+      "T": 1790877850830,
+      "m": false,
+      "M": true
+     }
+    }
+   }
+  ],
+  "kline_1s": [
+   {
+    "recv_ms": 1790877851055.6895,
+    "msg": {
+     "stream": "btcusdt@kline_1s",
+     "data": {
+      "e": "kline",
+      "E": 1790877851021,
+      "s": "BTCUSDT",
+      "k": {
+       "t": 1790877850000,
+       "T": 1790877850999,
+       "s": "BTCUSDT",
+       "i": "1s",
+       "f": 6729028578,
+       "L": 6729028764,
+       "o": "84727.73000000",
+       "c": "84740.58000000",
+       "h": "84740.58000000",
+       "l": "84727.73000000",
+       "v": "0.32397000",
+       "n": 187,
+       "x": true,
+       "q": "27450.71244100",
+       "V": "0.32300000",
+       "Q": "27368.52046100",
+       "B": "0"
+      }
+     }
+    }
+   }
+  ],
+  "bookTicker": [
+   {
+    "recv_ms": 1790877850698.4688,
+    "msg": {
+     "stream": "btcusdt@bookTicker",
+     "data": {
+      "u": 100938337475,
+      "s": "BTCUSDT",
+      "b": "84740.57000000",
+      "B": "4.91918000",
+      "a": "84740.58000000",
+      "A": "0.68822000"
+     }
+    }
+   }
+  ]
+ }
+}
